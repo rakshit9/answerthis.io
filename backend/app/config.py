@@ -28,7 +28,7 @@ class Settings:
     openai_api_key: str = _env("OPENAI_API_KEY")
     openai_model: str = _env("PIA_OPENAI_MODEL", "gpt-4o-mini")
     gemini_api_key: str = _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
-    gemini_model: str = _env("PIA_GEMINI_MODEL", "gemini-2.0-flash")
+    gemini_model: str = _env("PIA_GEMINI_MODEL", "gemini-flash-latest")
 
     # --- academic search ----------------------------------------------
     semantic_scholar_api_key: str = _env("S2_API_KEY")

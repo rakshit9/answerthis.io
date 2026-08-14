@@ -48,7 +48,7 @@ cd backend && python -m pytest tests/    # 63 tests for the core behaviors
 | Env var | Default | Meaning |
 |---|---|---|
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` | — | LLM for the agent + claim checks. Pluggable: `PIA_LLM_PROVIDER=openai\|gemini\|auto` |
-| `PIA_OPENAI_MODEL` / `PIA_GEMINI_MODEL` | `gpt-4o-mini` / `gemini-2.0-flash` | model per provider |
+| `PIA_OPENAI_MODEL` / `PIA_GEMINI_MODEL` | `gpt-4o-mini` / `gemini-flash-latest` | model per provider |
 | `S2_API_KEY` | — | optional Semantic Scholar key (free) — without it the shared pool is slow/429-prone |
 | `OPENALEX_MAILTO` | example addr | puts OpenAlex calls in the polite pool |
 | `PIA_MAX_QUERIES_PER_REVIEW` | 10 | cap on external searches per review |
