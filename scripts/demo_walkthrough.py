@@ -4,6 +4,7 @@ Usage:  python3 scripts/demo_walkthrough.py <pdf_path> <out_dir>
 Needs the backend running on :8000 (with LLM key) and network access to the
 academic APIs (or a warmed cache).
 """
+import os
 import sys
 import time
 from pathlib import Path
@@ -36,9 +37,16 @@ def main() -> None:
     print("paper:", pid, r.json()["title"], flush=True)
 
     # --- resolve references --------------------------------------------
+    # Bounded wait: on a rate-limited free tier some references will still be
+    # unresolved when we move on. That is the honest state and the UI shows it,
+    # so the walkthrough proceeds instead of hanging.
     httpx.post(f"{BASE}/api/papers/{pid}/resolve", timeout=30)
-    wait_for(lambda: httpx.get(f"{BASE}/api/papers/{pid}/resolve/status",
-                               timeout=30).json()["done"], timeout_s=900, every=5)
+    try:
+        wait_for(lambda: httpx.get(f"{BASE}/api/papers/{pid}/resolve/status",
+                                   timeout=30).json()["done"],
+                 timeout_s=int(os.environ.get("PIA_DEMO_RESOLVE_WAIT_S", "420")), every=5)
+    except TimeoutError:
+        print("resolution: bounded wait elapsed, continuing", flush=True)
     st = httpx.get(f"{BASE}/api/papers/{pid}/resolve/status", timeout=30).json()
     print("resolution:", st["counts"], flush=True)
 

@@ -35,7 +35,12 @@ function FindingCard({ f }: { f: Finding }) {
         <blockquote className="small">Abstract says: “{f.evidence_quote}”</blockquote>
       )}
       {f.source && <SourceLine s={f.source} />}
-      {f.provenance && <div className="prov">provenance: {f.provenance}{f.llm_used ? ` · judged by ${f.llm_used}` : ""}</div>}
+      {f.provenance && (
+        <div className="prov">
+          provenance: {f.provenance}
+          {f.llm_used && !f.provenance.includes(f.llm_used) ? ` · judged by ${f.llm_used}` : ""}
+        </div>
+      )}
     </div>
   );
 }
