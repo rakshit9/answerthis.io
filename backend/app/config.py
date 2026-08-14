@@ -40,6 +40,14 @@ class Settings:
     max_queries_per_review: int = int(_env("PIA_MAX_QUERIES_PER_REVIEW", "10"))
     max_claim_checks_per_review: int = int(_env("PIA_MAX_CLAIM_CHECKS", "12"))
     http_timeout_s: float = float(_env("PIA_HTTP_TIMEOUT", "20"))
+    # Retries per external GET on transient 429/5xx. Raise this when running
+    # against the *shared* (unauthenticated) Semantic Scholar pool, where a
+    # single request often needs several attempts to get through.
+    http_max_retries: int = int(_env("PIA_HTTP_MAX_RETRIES", "3"))
+    # Upper bound on a single backoff sleep. The shared S2 pool frees up in
+    # seconds, so many short retries beat few long ones; an explicit
+    # Retry-After from the server is still honored up to this cap.
+    http_backoff_cap_s: float = float(_env("PIA_HTTP_BACKOFF_CAP", "10"))
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

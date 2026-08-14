@@ -36,7 +36,6 @@ def main() -> None:
     print("paper:", pid, r.json()["title"], flush=True)
 
     # --- resolve references --------------------------------------------
-    httpx.post(f"{BASE}/api/resolve-noop", timeout=5) if False else None
     httpx.post(f"{BASE}/api/papers/{pid}/resolve", timeout=30)
     wait_for(lambda: httpx.get(f"{BASE}/api/papers/{pid}/resolve/status",
                                timeout=30).json()["done"], timeout_s=900, every=5)
@@ -85,9 +84,7 @@ def main() -> None:
         pg.goto(BASE, wait_until="networkidle")
         pg.screenshot(path=str(out_dir / "01_upload.png"))
 
-        pg.goto(f"{BASE}/?p={pid}", wait_until="networkidle")
-        # SPA has no routing; click through the recent list instead
-        pg.goto(BASE, wait_until="networkidle")
+        # the SPA has no URL routing; open the paper via the recent list
         pg.click(".recent .card")
         pg.wait_for_selector(".ref-table", timeout=20000)
         time.sleep(1)

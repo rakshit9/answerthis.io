@@ -39,9 +39,16 @@
 - Free-tier rate limits are real: Semantic Scholar's shared unauthenticated
   pool 429s readily (get the free `S2_API_KEY`), and OpenAlex has a daily
   request budget per IP. The app caches every response on disk, rate-limits
-  itself, backs off on 429, and turns definitive failures into visible
-  findings — but a fully exhausted quota means "the search failed", honestly
-  reported, not silently empty results.
+  itself, backs off on transient 429s, and turns definitive failures into
+  visible findings — but a fully exhausted quota means "the search failed",
+  honestly reported, not silently empty results.
+- The client distinguishes *"slow down"* from *"your budget is spent"*: a
+  transient 429 is retried with backoff (`PIA_HTTP_MAX_RETRIES`, raise it on
+  the shared S2 pool), while a quota-exhausted body (e.g. OpenAlex
+  "Insufficient budget") fails immediately — retrying a daily budget only
+  burns wall-clock. Both end up as visible findings, but only one wastes time.
+  From a shared/cloud IP (as in the recorded demo) OpenAlex's daily budget can
+  already be spent by other users of that IP; from a normal machine it is not.
 - Resolution quality is bounded by the APIs' coverage; ~90%+ of arXiv-paper
   references resolve, older venue-only references often stay `unresolved`
   (kept, flagged, excluded from claim checks with the reason shown).

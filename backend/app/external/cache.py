@@ -23,10 +23,25 @@ DEFAULT_TTL_S = 7 * 24 * 3600
 class ApiError(Exception):
     """Honest failure of an external call — surfaced, never swallowed."""
 
-    def __init__(self, api: str, message: str, status: int | None = None):
+    def __init__(self, api: str, message: str, status: int | None = None,
+                 exhausted: bool = False):
         self.api = api
         self.status = status
+        # True when the API says the *budget/quota* is spent (as opposed to
+        # "you are going too fast"): retrying cannot help, so we fail fast.
+        self.exhausted = exhausted
         super().__init__(f"[{api}] {message}")
+
+
+# Response bodies that mean "your budget is spent", not "slow down". Retrying
+# a daily-budget rejection only burns wall-clock, so these fail immediately.
+_QUOTA_EXHAUSTED_MARKERS = ("insufficient budget", "daily limit", "quota exceeded",
+                            "exceeded your daily")
+
+
+def _is_quota_exhausted(body: str) -> bool:
+    low = body.lower()
+    return any(m in low for m in _QUOTA_EXHAUSTED_MARKERS)
 
 
 class RateLimiter:
@@ -53,7 +68,7 @@ def cached_get(api: str, url: str, params: dict[str, Any],
                headers: dict[str, str] | None = None,
                limiter: Optional[RateLimiter] = None,
                ttl_s: int = DEFAULT_TTL_S,
-               max_retries: int = 3) -> dict:
+               max_retries: int | None = None) -> dict:
     """GET with disk cache, client-side rate limiting and 429/5xx backoff.
 
     Raises ``ApiError`` on definitive failure — callers surface it to the
@@ -69,6 +84,8 @@ def cached_get(api: str, url: str, params: dict[str, Any],
         except Exception:
             path.unlink(missing_ok=True)
 
+    if max_retries is None:
+        max_retries = settings.http_max_retries
     delay = 1.5
     last_err: Exception | None = None
     for attempt in range(max_retries):
@@ -87,10 +104,14 @@ def cached_get(api: str, url: str, params: dict[str, Any],
             path.write_text(json.dumps({"_cached_at": time.time(), "data": data}))
             return data
         if resp.status_code in (429, 500, 502, 503):
+            if _is_quota_exhausted(resp.text):
+                raise ApiError(
+                    api, f"quota exhausted (HTTP {resp.status_code}): "
+                         f"{resp.text[:120]}", resp.status_code, exhausted=True)
             retry_after = resp.headers.get("retry-after")
             wait_s = float(retry_after) if retry_after and retry_after.isdigit() else delay
-            time.sleep(min(wait_s, 30))
-            delay *= 2
+            time.sleep(min(wait_s, settings.http_backoff_cap_s))
+            delay = min(delay * 2, settings.http_backoff_cap_s)
             last_err = ApiError(api, f"HTTP {resp.status_code} (rate limited or busy)",
                                 resp.status_code)
             continue

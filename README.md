@@ -40,7 +40,7 @@ Test with any real paper — arXiv PDFs work well (their references resolve on
 both APIs). e.g. `curl -L -o paper.pdf https://arxiv.org/pdf/1706.03762`.
 
 ```bash
-cd backend && python -m pytest tests/    # 63 tests for the core behaviors
+cd backend && python -m pytest tests/    # 67 tests for the core behaviors
 ```
 
 ## Configuration
@@ -53,6 +53,8 @@ cd backend && python -m pytest tests/    # 63 tests for the core behaviors
 | `OPENALEX_MAILTO` | example addr | puts OpenAlex calls in the polite pool |
 | `PIA_MAX_QUERIES_PER_REVIEW` | 10 | cap on external searches per review |
 | `PIA_MAX_CLAIM_CHECKS` | 12 | cap on claim–citation checks per review |
+| `PIA_HTTP_BACKOFF_CAP` | 10 | max seconds for one backoff sleep (the shared S2 pool frees up in seconds, so many short retries beat few long ones) |
+| `PIA_HTTP_MAX_RETRIES` | 3 | retries per external GET on transient 429/5xx. Raise it (e.g. `15`) when using the *shared* unauthenticated Semantic Scholar pool, where requests often need several attempts. Quota-exhausted responses (e.g. OpenAlex "Insufficient budget") are never retried — they fail fast and are reported. |
 
 No LLM key? Parsing, resolution, rendering, keyword-search-based missing-work
 review, and export all still work; claim verdicts and editing report honestly
@@ -98,6 +100,6 @@ backend/app/
   agent/      planner → typed ops → integrity checker → apply
   export/     LaTeX / BibTeX / Markdown / provenance
   api/        FastAPI routes; store.py = on-disk JSON persistence
-backend/tests/  63 pytest tests incl. a synthetic-PDF integration test
+backend/tests/  67 pytest tests incl. a synthetic-PDF integration test
 frontend/       React + TS: upload → parse → read → review → edit (diff+approve) → export
 ```
