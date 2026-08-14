@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/components/EditView.tsx","./src/components/ExportView.tsx","./src/components/ParseView.tsx","./src/components/ReaderView.tsx","./src/components/ReviewView.tsx","./src/components/Upload.tsx","./src/components/bits.tsx","./src/components/diff.tsx"],"version":"5.9.3"}
