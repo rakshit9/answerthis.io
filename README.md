@@ -38,7 +38,7 @@ Test with any real paper — arXiv PDFs work well (their references resolve on
 both APIs). e.g. `curl -L -o paper.pdf https://arxiv.org/pdf/1706.03762`.
 
 ```bash
-cd backend && python -m pytest tests/    # 107 tests for the core behaviors
+cd backend && python -m pytest tests/    # 116 tests for the core behaviors
 ```
 
 ## Configuration
@@ -111,6 +111,6 @@ backend/app/
   agent/      planner → typed ops → integrity checker → apply
   export/     LaTeX / BibTeX / Markdown / provenance
   api/        FastAPI routes; store.py = on-disk JSON persistence
-backend/tests/  107 pytest tests incl. synthetic-PDF integration + float-capture tests
+backend/tests/  116 pytest tests incl. synthetic-PDF integration + float-capture tests
 frontend/       React + TS: upload → parse → read → review → edit (diff+approve) → export
 ```

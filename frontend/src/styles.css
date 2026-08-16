@@ -546,6 +546,22 @@ h3 > svg { color: var(--muted); }
 .reader .bib-entry.raw { color: var(--warn); }
 .reader .bib-id { font-family: var(--mono); font-size: var(--text-caption); color: var(--faint); margin-right: var(--sp-8); }
 
+/* Accepting a finding is an action on the finding, so it lives on the card —
+   but it proposes, it doesn't apply, and the caption says so. */
+.finding-act {
+  display: flex; align-items: center; gap: var(--sp-12);
+  margin-top: var(--sp-12); flex-wrap: wrap;
+}
+.cite-this {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent); color: var(--ink); border: none;
+  padding: 6px 14px; border-radius: var(--r-pill);
+  font-size: var(--text-body-sm); font-weight: 500;
+}
+.cite-this:hover { background: var(--ink); color: var(--accent); }
+.cite-this:disabled { opacity: .5; }
+.finding .error-banner.small { margin-top: var(--sp-8); font-size: var(--text-caption); }
+
 /* ============================== review ============================== */
 .finding {
   border: 1px solid var(--line); border-left: 3px solid var(--line-strong);

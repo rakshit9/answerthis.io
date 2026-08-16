@@ -25,7 +25,13 @@ const VERDICT_LABEL: Record<string, string> = {
 
 const SEV_TONE: Record<string, string> = { high: "bad", medium: "warn", info: "good" };
 
-function FindingCard({ f, onJump }: { f: Finding; onJump: (sectionId: string) => void }) {
+function FindingCard({ f, onJump, onCite, citing, citeError }: {
+  f: Finding; onJump: (sectionId: string) => void;
+  onCite?: (f: Finding) => void; citing?: boolean; citeError?: string | null;
+}) {
+  // Only a missing-work finding with a real source is actionable: the others
+  // are observations about the paper, not works it could cite.
+  const canCite = f.type === "missing_work" && !!f.source && !!f.section_id;
   return (
     <div className={`card finding ${f.severity}`}>
       <div className="ftitle">
@@ -48,6 +54,16 @@ function FindingCard({ f, onJump }: { f: Finding; onJump: (sectionId: string) =>
       {!f.verdict && f.detail && <div className="small">{f.detail}</div>}
       {f.evidence_quote && <blockquote className="small">Abstract says: “{f.evidence_quote}”</blockquote>}
       {f.source && <SourceLine s={f.source} />}
+      {canCite && onCite && (
+        <div className="finding-act">
+          <button className="cite-this" disabled={citing}
+            onClick={() => onCite(f)}>
+            {citing ? "Preparing…" : <><Icon.link size={13} /> Cite this</>}
+          </button>
+          <span className="small muted">proposes the edit — you still approve it</span>
+        </div>
+      )}
+      {citeError && <div className="error-banner small">{citeError}</div>}
       {f.provenance && (
         <div className="prov">
           provenance: {f.provenance}
@@ -72,6 +88,8 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
   const [missingWork, setMissingWork] = useState(true);
   const [claimChecks, setClaimChecks] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [citing, setCiting] = useState<string | null>(null);       // finding id
+  const [citeError, setCiteError] = useState<{ id: string; msg: string } | null>(null);
   const reviewTimer = useRef<number | null>(null);
 
   // ---- manual in-place editing ----
@@ -115,6 +133,24 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
     p.changes.forEach((c) => { a[c.id] = p.integrity.ok; });
     setApproved(a);
   };
+
+  /** Accept a missing-work finding. The result is a normal proposal, so it
+   *  opens the edit panel with a diff to approve — accepting a finding is
+   *  not the same as applying it. */
+  const citeFinding = useCallback(async (f: Finding) => {
+    if (!run) return;
+    setCiting(f.id); setCiteError(null);
+    try {
+      const p = await api.citeFinding(paper.id, run.id, f.id);
+      setProp(p);
+      setProposals((ps) => [p, ...ps.filter((x) => x.id !== p.id)]);
+      seedApprovals(p);
+      setPanel("edit");
+    } catch (e) {
+      setCiteError({ id: f.id, msg: String(e instanceof Error ? e.message : e) });
+    } finally { setCiting(null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paper.id, run]);
 
   const pollEdit = useCallback((propId: string) => {
     api.proposal(paper.id, propId).then((p) => {
@@ -567,7 +603,11 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
             )}
             {run?.error && <div className="error-banner">{run.error}</div>}
 
-            {run && run.findings.map((f) => <FindingCard key={f.id} f={f} onJump={jumpTo} />)}
+            {run && run.findings.map((f) => (
+              <FindingCard key={f.id} f={f} onJump={jumpTo} onCite={citeFinding}
+                citing={citing === f.id}
+                citeError={citeError?.id === f.id ? citeError.msg : null} />
+            ))}
             {run && run.status === "done" && run.findings.length === 0 && (
               <div className="empty"><EmptyArt kind="review" /><p>No findings.</p></div>
             )}

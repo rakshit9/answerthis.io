@@ -136,6 +136,32 @@ def start_edit(paper_id: str, body: dict):
     return {"proposal_id": pending.id, "status": pending.status.value}
 
 
+@router.post("/papers/{paper_id}/reviews/{run_id}/findings/{finding_id}/cite")
+def cite_finding(paper_id: str, run_id: str, finding_id: str):
+    """Accept a missing-work finding: propose citing exactly that source.
+
+    Returns a normal proposal, so it lands in the same diff + approve flow as
+    an agent edit — accepting a finding is not the same as applying it.
+    """
+    doc = store.load_paper(paper_id)
+    if doc is None:
+        raise HTTPException(404, "No such paper")
+    run = store.load_review(paper_id, run_id)
+    if run is None:
+        raise HTTPException(404, "No such review run")
+    finding = next((f for f in run.findings if f.id == finding_id), None)
+    if finding is None:
+        raise HTTPException(404, "No such finding in that review run")
+
+    with store.lock_for(paper_id):
+        prop = commands.cite_finding(doc, finding)
+        store.save_proposal(prop)
+    if prop.status == ProposalStatus.FAILED:
+        raise HTTPException(409, detail={"message": prop.error,
+                                         "proposal_id": prop.id})
+    return prop.model_dump()
+
+
 @router.get("/papers/{paper_id}/proposals/{prop_id}")
 def get_proposal(paper_id: str, prop_id: str):
     prop = store.load_proposal(paper_id, prop_id)

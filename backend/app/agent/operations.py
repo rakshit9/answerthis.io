@@ -134,21 +134,9 @@ def op_find_citations(doc: PaperDocument, section: Section, topic: str,
         # ---- F4: create reference + insert token ----------------------
         ref_id = f"ref_{next_ref_num}"
         next_ref_num += 1
-        csl = dict(src.csl)
-        csl["id"] = ref_id
-        new_ref = Reference(
-            id=ref_id, raw_text=f"[agent-added] {src.title}",
-            parsed=ParsedFields(
-                authors=[_family_first(a) for a in src.authors[:12]],
-                year=src.year, title=src.title, container=src.venue,
-                doi=src.doi, url=src.url),
-            parse_confidence=1.0, csl=csl,
-            resolution=Resolution(
-                status=ResolutionStatus.RESOLVED, source=src.api,
-                source_id=src.api_id, source_url=src.url, doi=src.doi,
-                match_score=1.0, method="agent_search", abstract=src.abstract),
-            added_by="agent",
-            added_reason=f"Supports: “{sentence[:160]}” (query: “{query}”)")
+        new_ref = reference_from_source(
+            src, ref_id, method="agent_search",
+            reason=f"Supports: “{sentence[:160]}” (query: “{query}”)")
         proposal.new_references.append(new_ref)
         proposal.citation_adds.append(CitationAdd(
             ref_id=ref_id,
@@ -227,6 +215,43 @@ def op_rewrite_section(section: Section, instruction: str,
 
 
 # ---------------------------------------------------------------- helpers --
+
+def reference_from_source(src: ExternalSource, ref_id: str, *,
+                          method: str, reason: str) -> Reference:
+    """Turn a real external record into a Reference the document can hold.
+
+    Shared by the two ways a citation enters a paper — the agent's own search
+    and a reviewer accepting a missing-work finding — so both produce
+    identically shaped references, resolved and carrying their provenance.
+    The integrity checker requires that provenance (rule I3), so this is the
+    only sanctioned way to construct one.
+    """
+    csl = dict(src.csl)
+    csl["id"] = ref_id
+    return Reference(
+        id=ref_id, raw_text=f"[agent-added] {src.title}",
+        parsed=ParsedFields(
+            authors=[_family_first(a) for a in src.authors[:12]],
+            year=src.year, title=src.title, container=src.venue,
+            doi=src.doi, url=src.url),
+        parse_confidence=1.0, csl=csl,
+        resolution=Resolution(
+            status=ResolutionStatus.RESOLVED, source=src.api,
+            source_id=src.api_id, source_url=src.url, doi=src.doi,
+            match_score=1.0, method=method, abstract=src.abstract),
+        added_by="agent", added_reason=reason)
+
+
+def locate_sentence(text: str, sentence: str) -> tuple[int, int] | None:
+    """Public alias — see :func:`_locate_sentence`."""
+    return _locate_sentence(text, sentence)
+
+
+def insert_token_at_sentence_end(text: str, span: tuple[int, int],
+                                 token: str) -> str:
+    """Public alias — see :func:`_insert_token_at_sentence_end`."""
+    return _insert_token_at_sentence_end(text, span, token)
+
 
 def _family_first(name: str) -> str:
     parts = name.rsplit(" ", 1)

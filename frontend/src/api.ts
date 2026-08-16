@@ -61,6 +61,10 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ command }),
     }).then((r) => j<{ proposal_id: string }>(r)),
+  /** Accept a missing-work finding → a proposal to cite exactly that source. */
+  citeFinding: (id: string, runId: string, findingId: string) =>
+    fetch(`/api/papers/${id}/reviews/${runId}/findings/${findingId}/cite`,
+      { method: "POST" }).then((r) => j<EditProposal>(r)),
   proposal: (id: string, propId: string) =>
     fetch(`/api/papers/${id}/proposals/${propId}`).then((r) => j<EditProposal>(r)),
   proposals: (id: string) =>
