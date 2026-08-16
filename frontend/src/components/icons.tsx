@@ -76,6 +76,9 @@ export const Icon = {
     <svg {...s(size)}><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4" />
       <path d="M8 8l4-4 4 4" /><path d="M12 4v12" /></svg>
   ),
+  chevron: ({ size }: P = {}) => (
+    <svg {...s(size)}><path d="M6 9l6 6 6-6" /></svg>
+  ),
 };
 
 /** Upload illustration: a manuscript being scanned — a lime read-head sweeps

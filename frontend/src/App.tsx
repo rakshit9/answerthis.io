@@ -6,6 +6,7 @@ import { ParsingView } from "./components/ParsingView";
 import { ParseView } from "./components/ParseView";
 import { Workspace } from "./components/Workspace";
 import { ExportView } from "./components/ExportView";
+import { PaperPicker } from "./components/PaperPicker";
 import { Icon } from "./components/icons";
 
 type Tab = "parse" | "paper" | "export";
@@ -134,7 +135,14 @@ export default function App() {
               {tab === "parse" ? "Overview" : tab === "paper" ? "Paper" : "Export"}
             </span>
             <span className="crumb">/</span>
-            <span className="paper-title">{paper.meta.title || paper.filename}</span>
+            <PaperPicker
+              current={{
+                id: paper.id,
+                title: paper.meta.title || paper.filename,
+                version: paper.version,
+              }}
+              onPick={openPaper}
+              onUpload={goHome} />
             <span className="crumb">v{paper.version}</span>
             <span className="spacer" />
           </div>

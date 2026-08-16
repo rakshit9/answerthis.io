@@ -183,9 +183,66 @@ h3 > svg { color: var(--muted); }
   text-transform: uppercase; color: var(--muted);
 }
 .topbar .crumb b { color: var(--ink); font-weight: 500; }
+/* The title is the switcher: it stays a breadcrumb until you hover it, so
+   the topbar doesn't grow a button that shouts for attention. */
+.paper-picker { position: relative; min-width: 0; }
 .topbar .paper-title {
   font-size: var(--text-body-sm); font-weight: 500; color: var(--ink); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; max-width: 46vw;
+  display: inline-flex; align-items: center; gap: 7px;
+  background: none; border: 1px solid transparent; border-radius: var(--r-pill);
+  padding: 5px 10px; margin-left: -10px; cursor: pointer;
+  transition: background .14s, border-color .14s;
+}
+.topbar .paper-title svg { color: var(--muted); flex-shrink: 0; }
+.topbar .paper-title:hover { background: var(--bg-soft); border-color: var(--line); }
+
+.picker-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  min-width: 340px; max-width: min(520px, 80vw);
+  max-height: 60vh; overflow-y: auto;
+  background: var(--color-pure-white); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: var(--sp-8);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .10); animation: fadeUp .16s both;
+}
+.picker-head {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--faint); padding: var(--sp-8) 10px var(--sp-4);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.picker-search {
+  width: 100%; font: inherit; font-size: var(--text-body-sm);
+  padding: 8px 10px; margin-bottom: var(--sp-4);
+  border: 1px solid var(--line); border-radius: var(--r-inner);
+  background: var(--bg-soft); color: var(--ink);
+}
+.picker-search:focus { outline: none; border-color: var(--ink); background: var(--color-pure-white); }
+.picker-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; text-align: left; border: none; background: none;
+  padding: 9px 10px; border-radius: var(--r-inner);
+  transition: background .12s;
+}
+.picker-row:hover { background: var(--bg-soft); }
+.picker-row.on { background: var(--accent); }
+.picker-name {
+  font-size: var(--text-body-sm); font-weight: 500; color: var(--ink);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.picker-meta {
+  font-size: var(--text-caption); color: var(--muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.picker-row.on .picker-meta { color: var(--ink); opacity: .7; }
+.picker-row.upload {
+  flex-direction: row; align-items: center; gap: 8px; color: var(--muted);
+  font-size: var(--text-body-sm); font-weight: 500;
+  border-top: 1px solid var(--line); border-radius: 0 0 var(--r-inner) var(--r-inner);
+  margin-top: var(--sp-4); padding-top: var(--sp-12);
+}
+.picker-row.upload:hover { color: var(--ink); }
+.picker-empty {
+  padding: var(--sp-12) 10px; font-size: var(--text-body-sm); color: var(--muted);
 }
 .topbar .spacer { flex: 1; }
 /* Pages read as parchment; cards lift to pure white above them (Perk's

@@ -26,7 +26,7 @@ export const api = {
   },
   parseStatus: (id: string) =>
     fetch(`/api/papers/${id}/parse`).then((r) => j<ParseJob>(r)),
-  papers: () => fetch("/api/papers").then((r) => j<{ id: string; title: string; filename: string; n_references: number; version: number }[]>(r)),
+  papers: () => fetch("/api/papers").then((r) => j<{ id: string; title: string; filename: string; n_references: number; version: number; uploaded_at: number }[]>(r)),
   paper: (id: string) => fetch(`/api/papers/${id}`).then((r) => j<Paper>(r)),
   rendered: (id: string, style?: string) =>
     fetch(`/api/papers/${id}/rendered${style ? `?style=${style}` : ""}`).then((r) => j<RenderedDoc>(r)),
