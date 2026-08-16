@@ -10,16 +10,22 @@ system without a real, linkable source.
 
 ## Watch it
 
-[![Feature tour](screenshots/feature-tour-preview.gif)](screenshots/feature-tour.mp4)
+<p align="center">
+  <a href="screenshots/feature-tour.mp4">
+    <img src="screenshots/feature-tour-preview.gif" alt="Feature tour" width="760">
+  </a>
+</p>
+
+<p align="center">
+  <b><a href="screenshots/feature-tour.mp4">▶ Full feature tour — 3.8 min, with narration</a></b>
+</p>
 
 The loop above plays right here — five moments from the tour, silent: the
 parse stages landing one by one, a citation jumping to its entry, review
-findings against live search, approving a diff, and the LaTeX view.
-
-**[▶ Full feature tour — 3.8 min, with narration](screenshots/feature-tour.mp4)**
-— click the loop or that link. GitHub strips `<video>` out of README files, so
-the full film opens on its own page, where it plays in the browser. No
-download either way.
+findings against live search, approving a diff, and the LaTeX view. Click it,
+or the link, for the narrated film: GitHub strips `<video>` out of README
+files, so the full version opens on its own page, where it plays in the
+browser. No download either way.
 
 The whole workflow on a real 24-page paper: upload and the six parse stages,
 what the parser found and what it refused, citations as links, peer review
