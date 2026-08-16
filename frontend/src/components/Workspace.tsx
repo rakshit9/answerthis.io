@@ -6,6 +6,7 @@ import type {
 import { Badge, SourceLine } from "./bits";
 import { DiffView } from "./diff";
 import { LatexPane } from "./LatexPane";
+import { ReaderOutline } from "./ReaderOutline";
 import { EmptyArt, Icon } from "./icons";
 
 const EXAMPLES = [
@@ -323,6 +324,7 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
             {!doc ? (
               <div className="muted" style={{ padding: 24 }}><span className="spin" /> Rendering with citeproc…</div>
             ) : (
+              <div className="reader-layout">
               <article className="sheet reader">
                 <h1 style={{ fontSize: 25, marginTop: 0 }}>{paper.meta.title}</h1>
                 {paper.meta.authors.length > 0 && (
@@ -422,6 +424,9 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                   </div>
                 ))}
               </article>
+
+              <ReaderOutline sections={doc.sections} onJump={jumpTo} />
+              </div>
             )}
           </div>
         )}

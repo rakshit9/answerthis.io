@@ -658,6 +658,52 @@ select:focus { outline: none; border-color: var(--ink); }
 }
 @media (max-width: 1100px) { .sheet { padding: var(--sp-24); } }
 
+/* Sheet + structure rail. The breakpoint is a *container* query, not a
+   viewport one: this sits inside the split workspace behind an 84px dock, so
+   the pane is far narrower than the window and a viewport breakpoint would
+   read the wrong number. Below it the rail goes away rather than squeezing
+   the manuscript — the sheet keeps priority on the width it has. */
+.sheet-scroll { container-type: inline-size; }
+.reader-layout {
+  display: grid; grid-template-columns: minmax(0, 720px);
+  gap: var(--sp-24); justify-content: center; align-items: start;
+}
+.reader-layout .sheet { margin: 0; max-width: none; grid-column: 1; }
+.reader-outline { display: none; }
+
+@container (min-width: 820px) {
+  .reader-layout { grid-template-columns: minmax(0, 720px) 204px; }
+  .reader-outline { display: block; grid-column: 2; }
+}
+
+.reader-outline { position: sticky; top: 0; }
+.reader-outline-head {
+  font-size: var(--text-caption); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); font-weight: 500; margin: 0 0 var(--sp-8) 10px;
+}
+.reader-outline-list {
+  max-height: calc(100vh - 190px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.ro-item {
+  display: flex; align-items: baseline; gap: var(--sp-8);
+  width: 100%; text-align: left; border: none; background: none;
+  padding: 6px 10px; border-radius: var(--r-pill);
+  font-size: var(--text-body-sm); color: var(--muted); line-height: 1.35;
+}
+.ro-item.lvl2, .ro-item.lvl3 { padding-left: 22px; font-size: var(--text-caption); }
+.ro-item .ro-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ro-item .ro-kind {
+  margin-left: auto; flex-shrink: 0; font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--color-ash);
+}
+.ro-item:hover { background: var(--bg); color: var(--ink); }
+/* Current section: the accent bar carries it, so the label only needs weight. */
+.ro-item.on {
+  background: var(--accent); color: var(--ink); font-weight: 500;
+}
+.ro-item.on .ro-kind { color: var(--ink); opacity: 0.65; }
+
 section.flash { animation: flashbg 1.8s ease-out; border-radius: var(--r-inner); }
 @keyframes flashbg {
   0% { background: var(--accent); box-shadow: 0 0 0 8px var(--accent); }
