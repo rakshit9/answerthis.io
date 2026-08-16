@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse, Response
 from .. import store
 from ..agent.apply import recompute_intext
 from ..config import settings
-from ..cslproc.render import DocumentRenderer, list_styles
+from ..cslproc.render import DocumentRenderer, list_styles, style_samples
 from ..export.latex import build_latex, build_zip
 from ..models.core import SectionKind, extract_token_ref_ids
 from ..parsing.pdf_extract import PdfExtractionError
@@ -185,6 +185,25 @@ def edit_section(paper_id: str, section_id: str, body: dict):
         recompute_intext(doc)
         store.save_paper(doc)
     return {"ok": True, "version": doc.version, "changed": True}
+
+
+_samples_cache: dict[str, tuple[int, dict]] = {}
+
+
+@router.get("/papers/{paper_id}/style-samples")
+def get_style_samples(paper_id: str):
+    """Each available style rendered against this paper's own first cited
+    references, so the export screen can show what a style switch does before
+    the user commits to it. Cached per document version — the samples only
+    move when the references do."""
+    doc = store.load_paper(paper_id)
+    if doc is None:
+        raise HTTPException(404, "No such paper")
+    cached = _samples_cache.get(paper_id)
+    if cached is None or cached[0] != doc.version:
+        cached = (doc.version, style_samples(doc))
+        _samples_cache[paper_id] = cached
+    return cached[1]
 
 
 @router.post("/papers/{paper_id}/style")

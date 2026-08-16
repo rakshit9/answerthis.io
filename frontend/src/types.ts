@@ -141,4 +141,23 @@ export interface ParseJob {
 }
 
 export interface Health { llm: string | null; llm_hint: string | null; semantic_scholar_key: boolean }
-export interface StyleInfo { id: string; title: string }
+export interface StyleInfo {
+  id: string;
+  title: string;
+  author_year?: boolean;
+  /** "author–date" | "numeric" — how in-text citations are formed. */
+  family?: string;
+  in_text?: string;
+  bibliography?: string;
+  /** What switching to this style changes in the exported paper. */
+  changes?: string[];
+}
+
+/** One style rendered against this paper's own first cited references. */
+export interface StyleSample {
+  parenthetical?: string;
+  narrative?: string;
+  group?: string | null;
+  bibliography?: string[];
+  error?: string;
+}

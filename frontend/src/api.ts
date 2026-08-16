@@ -1,5 +1,6 @@
 import type {
   EditProposal, Health, Paper, ParseJob, RenderedDoc, ReviewRun, StyleInfo,
+  StyleSample,
 } from "./types";
 
 async function j<T>(r: Response): Promise<T> {
@@ -30,6 +31,8 @@ export const api = {
   paper: (id: string) => fetch(`/api/papers/${id}`).then((r) => j<Paper>(r)),
   rendered: (id: string, style?: string) =>
     fetch(`/api/papers/${id}/rendered${style ? `?style=${style}` : ""}`).then((r) => j<RenderedDoc>(r)),
+  styleSamples: (id: string) =>
+    fetch(`/api/papers/${id}/style-samples`).then((r) => j<Record<string, StyleSample>>(r)),
   setStyle: (id: string, style: string) =>
     fetch(`/api/papers/${id}/style`, {
       method: "POST", headers: { "Content-Type": "application/json" },
