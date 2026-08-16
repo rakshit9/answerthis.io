@@ -10,18 +10,16 @@ system without a real, linkable source.
 
 ## Watch it
 
-<video
-  src="https://github.com/rakshit9/answerthis.io/raw/master/screenshots/feature-tour.mp4"
-  poster="https://github.com/rakshit9/answerthis.io/raw/master/screenshots/00_video_poster.png"
-  controls
-  playsinline
-  width="100%">
-  <a href="https://github.com/rakshit9/answerthis.io/raw/master/screenshots/feature-tour.mp4">Feature tour (MP4, 3.8 min)</a>
-</video>
+[![Feature tour](screenshots/feature-tour-preview.gif)](screenshots/feature-tour.mp4)
 
-**Feature tour — 3.8 min, with narration.** Press play above on github.com. If
-you're reading this in an editor or a renderer that strips `<video>`, open
-[`screenshots/feature-tour.mp4`](screenshots/feature-tour.mp4) directly.
+The loop above plays right here — five moments from the tour, silent: the
+parse stages landing one by one, a citation jumping to its entry, review
+findings against live search, approving a diff, and the LaTeX view.
+
+**[▶ Full feature tour — 3.8 min, with narration](screenshots/feature-tour.mp4)**
+— click the loop or that link. GitHub strips `<video>` out of README files, so
+the full film opens on its own page, where it plays in the browser. No
+download either way.
 
 The whole workflow on a real 24-page paper: upload and the six parse stages,
 what the parser found and what it refused, citations as links, peer review
