@@ -12,6 +12,35 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv(path: Path) -> None:
+    """Read ``KEY=VALUE`` lines from ``backend/.env`` into the environment.
+
+    Deliberately tiny and dependency-free — this is the only thing the app
+    needs from python-dotenv. A real environment variable always wins, so
+    ``OPENAI_API_KEY=… uvicorn …`` still overrides the file; the file is the
+    convenience, not the authority.
+
+    Until this existed the backend read plain ``os.environ`` only, which made
+    writing a ``.env`` file look like it worked while doing nothing at all.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.removeprefix("export ").strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv(BACKEND_ROOT / ".env")
+
+
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 

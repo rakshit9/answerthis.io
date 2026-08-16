@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import type { Paper } from "../types";
+import { Loading } from "./Loading";
 import { Icon } from "./icons";
 
 /** Live LaTeX view with direct editing.
@@ -103,8 +104,22 @@ export function LatexPane({ paper, onChanged }: {
   // ---- direct editing of one section's body ----
   const [editing, setEditing] = useState<string | null>(null);   // sectionId
   const [draft, setDraft] = useState("");
+  const [original, setOriginal] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState<string | null>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const dirty = editing !== null && draft !== original;
+
+  // Grow the textarea to its content: an editor with its own inner scrollbar
+  // inside an already-scrolling file reads as a text box bolted onto the
+  // page, not as the file itself being editable.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [draft, editing]);
 
   useEffect(() => {
     setRebuilding(true); setError(null);
@@ -117,22 +132,42 @@ export function LatexPane({ paper, onChanged }: {
   const parsed = useMemo(() => (tex ? toBlocks(tex, paper) : null), [tex, paper]);
 
   const beginEdit = (sectionId: string) => {
+    // Switching sections mid-edit would drop unsaved text, so ask first.
+    if (dirty && editing !== sectionId &&
+        !window.confirm("Discard unsaved changes to the section you're editing?")) return;
     const content = paper.sections.find((s) => s.id === sectionId)?.content ?? "";
+    const body = toLatexBody(content);
     setEditing(sectionId);
-    setDraft(toLatexBody(content));
+    setDraft(body);
+    setOriginal(body);
+    setEditError(null);
+  };
+
+  const cancelEdit = () => {
+    if (dirty && !window.confirm("Discard your changes to this section?")) return;
+    setEditing(null);
     setEditError(null);
   };
 
   const saveEdit = async () => {
     if (!editing) return;
+    const sectionId = editing;
     setSaving(true); setEditError(null);
     try {
-      await api.editSection(paper.id, editing, fromLatexBody(draft), paper.version);
+      await api.editSection(paper.id, sectionId, fromLatexBody(draft), paper.version);
       setEditing(null);
+      setJustSaved(sectionId);
+      window.setTimeout(() => setJustSaved((s) => (s === sectionId ? null : s)), 2200);
       onChanged();                       // version bumps → tex refetches
     } catch (e) {
       setEditError(String(e instanceof Error ? e.message : e));
     } finally { setSaving(false); }
+  };
+
+  /** ⌘/Ctrl+Enter saves, Esc cancels — the shortcuts an editor implies. */
+  const onEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void saveEdit(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
   };
 
   const copyTex = () => {
@@ -144,7 +179,7 @@ export function LatexPane({ paper, onChanged }: {
   };
 
   if (error) return <div className="error-banner">{error}</div>;
-  if (!parsed) return <div className="muted" style={{ padding: 24 }}><span className="spin" /> Rebuilding LaTeX from the canonical model…</div>;
+  if (!parsed) return <Loading label="Rebuilding LaTeX from the canonical model…" />;
 
   return (
     <div className="texpane">
@@ -187,36 +222,49 @@ export function LatexPane({ paper, onChanged }: {
                 <div key={bi} className={`tex-sec ${isEditing ? "editing" : ""}`}>
                   <div id={b.head.anchor} className="tx-section tx-editable">
                     {b.head.text}
-                    {!isEditing && (
+                    {!isEditing && justSaved !== b.sectionId && (
                       <button className="tx-edit-btn" title="Edit this section directly"
                         onClick={() => beginEdit(b.sectionId)}>
                         <Icon.pencil size={11} /> edit
                       </button>
                     )}
+                    {justSaved === b.sectionId && (
+                      <span className="tx-saved"><Icon.check size={11} /> saved</span>
+                    )}
                     {"\n"}
                   </div>
                   {isEditing ? (
                     <div className="tex-sec-editor">
-                      <textarea value={draft} autoFocus spellCheck={false}
-                        onChange={(e) => setDraft(e.target.value)} />
+                      <textarea ref={taRef} value={draft} autoFocus spellCheck={false}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={onEditorKeyDown} />
                       {editError && <div className="error-banner">{editError}</div>}
                       <div className="tex-sec-bar">
-                        <span className="hint">\citep{"{…}"} commands are live citations — keep or delete, don't invent.</span>
+                        <span className="hint">
+                          \citep{"{…}"} commands are live citations — keep or delete, don't invent.
+                          {dirty && <b className="tex-dirty"> unsaved</b>}
+                        </span>
+                        <span className="tex-keys">⌘⏎ save · esc cancel</span>
                         <button className="tex-tool" disabled={saving}
-                          onClick={() => setEditing(null)}>Cancel</button>
-                        <button className="tex-tool save" disabled={saving}
+                          onClick={cancelEdit}>Cancel</button>
+                        <button className="tex-tool save" disabled={saving || !dirty}
                           onClick={() => void saveEdit()}>
                           {saving ? "Saving…" : "Save"}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    b.body.map((l, i) => (
-                      <div key={i} className={`tx-${l.kind}`}>
-                        {l.kind === "plain" ? withCites(l.text, bi * 1000 + i) : l.text}
-                        {"\n"}
-                      </div>
-                    ))
+                    // The body itself is the edit affordance — click the text
+                    // you want to change, the way you would in a real file.
+                    <div className="tx-body" title="Click to edit this section"
+                      onClick={() => beginEdit(b.sectionId)}>
+                      {b.body.map((l, i) => (
+                        <div key={i} className={`tx-${l.kind}`}>
+                          {l.kind === "plain" ? withCites(l.text, bi * 1000 + i) : l.text}
+                          {"\n"}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               );

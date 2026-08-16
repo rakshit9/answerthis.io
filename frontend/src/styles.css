@@ -631,6 +631,42 @@ select:focus { outline: none; border-color: var(--ink); }
 }
 @keyframes sp { to { transform: rotate(360deg); } }
 
+/* Centred wait state for a document being rebuilt. The bars fill in
+   sequence, so the motion reads as lines being typeset rather than as a
+   generic spinner. Indeterminate by design — it tracks nothing. */
+.loading {
+  flex: 1; min-height: 240px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--sp-20);
+  animation: fadeUp .24s both;
+}
+.loading-doc {
+  display: flex; flex-direction: column; gap: 7px; width: 132px;
+  padding: var(--sp-16); border-radius: var(--r-inner);
+  border: 1px solid var(--line); background: var(--color-pure-white);
+}
+.loading-doc i {
+  display: block; height: 7px; border-radius: 3px; background: var(--line);
+  transform-origin: left center; animation: typeset 1.5s ease-in-out infinite;
+}
+.loading-doc i:nth-child(1) { width: 100%; }
+.loading-doc i:nth-child(2) { width: 82%; }
+.loading-doc i:nth-child(3) { width: 91%; }
+.loading-doc i:nth-child(4) { width: 54%; }
+.loading-label {
+  font-size: var(--text-body-sm); color: var(--muted); letter-spacing: 0.01em;
+}
+@keyframes typeset {
+  0%, 100% { transform: scaleX(0.35); background: var(--line); }
+  45%      { transform: scaleX(1);    background: var(--accent); }
+}
+/* On the charcoal island the same shape needs its own palette. */
+.loading-dark .loading-doc { background: #26261f; border-color: #3d3d35; }
+.loading-dark .loading-doc i { background: #3d3d35; }
+.loading-dark .loading-label { color: var(--color-stone); font-family: var(--mono); font-size: var(--text-caption); }
+@media (prefers-reduced-motion: reduce) {
+  .loading-doc i { animation: none; transform: scaleX(1); opacity: .5; }
+}
+
 /* ============================== workspace split ============================== */
 .wsplit { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .paper-pane {
@@ -953,8 +989,25 @@ section:hover .sec-edit-btn { opacity: 1; }
   padding: 0 var(--sp-12) var(--sp-12); margin: 0 calc(-1 * var(--sp-12));
 }
 .tex-sec-editor { margin-top: var(--sp-8); font-family: var(--sans); }
+/* The body text is itself the click target, so it needs to read as
+   editable on hover — a faint tint and a caret, no button to hunt for. */
+.tx-body { cursor: text; border-radius: var(--r-inner); position: relative; }
+.tx-body:hover { background: rgba(190, 255, 80, .05); box-shadow: 0 0 0 6px rgba(190, 255, 80, .05); }
+.tx-saved {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--sans); font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--ink); background: var(--accent);
+  padding: 2px 9px; border-radius: var(--r-pill);
+  animation: fadeUp .2s both;
+}
+.tex-keys { font-family: var(--mono); font-size: 10px; color: #6f6f64; white-space: nowrap; }
+.tex-dirty { color: var(--accent); font-weight: 500; font-style: normal; }
+.tex-tool:disabled { opacity: .4; cursor: default; }
+
 .tex-sec-editor textarea {
-  width: 100%; min-height: 240px; resize: vertical;
+  /* Height is set from content in JS; this is only the floor. */
+  width: 100%; min-height: 160px; resize: vertical; overflow: hidden;
   font: 12.5px/1.8 var(--mono); color: #f2f2e6;
   background: #1e1e18; border: 1px solid var(--accent);
   border-radius: var(--r-inner); padding: var(--sp-16);

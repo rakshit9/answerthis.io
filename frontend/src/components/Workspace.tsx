@@ -6,6 +6,7 @@ import type {
 import { Badge, SourceLine } from "./bits";
 import { DiffView } from "./diff";
 import { LatexPane } from "./LatexPane";
+import { Loading } from "./Loading";
 import { ReaderOutline } from "./ReaderOutline";
 import { EmptyArt, Icon } from "./icons";
 
@@ -322,7 +323,7 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
           <div className="sheet-scroll" onMouseUp={onReaderMouseUp}
             onScroll={() => setSel(null)}>
             {!doc ? (
-              <div className="muted" style={{ padding: 24 }}><span className="spin" /> Rendering with citeproc…</div>
+              <Loading label="Rendering citations with citeproc…" />
             ) : (
               <div className="reader-layout">
               <article className="sheet reader">

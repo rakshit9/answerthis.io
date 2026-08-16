@@ -22,9 +22,7 @@ Requirements: Python 3.11+, Node 18+.
 # 1. backend
 cd backend
 pip install -r requirements.txt        # (or use a venv)
-export OPENAI_API_KEY=sk-...           # or GEMINI_API_KEY=... (enables the agent
-                                       #  + claim checks; app runs without, degraded honestly)
-export S2_API_KEY=...                  # optional: raises Semantic Scholar rate limits
+cp .env.example .env                   # then fill in your keys — see below
 uvicorn app.main:app --port 8000
 
 # 2. frontend (dev)
@@ -40,10 +38,19 @@ Test with any real paper — arXiv PDFs work well (their references resolve on
 both APIs). e.g. `curl -L -o paper.pdf https://arxiv.org/pdf/1706.03762`.
 
 ```bash
-cd backend && python -m pytest tests/    # 76 tests for the core behaviors
+cd backend && python -m pytest tests/    # 105 tests for the core behaviors
 ```
 
 ## Configuration
+
+Settings come from the environment. `backend/.env` is read at startup (see
+`_load_dotenv` in `app/config.py` — a dozen lines, no dependency); anything
+already exported wins over the file, so `OPENAI_API_KEY=… uvicorn …` still
+overrides it. `.env` is gitignored; `.env.example` lists the keys.
+
+Every key is optional. Without an LLM key the app still parses, renders and
+exports — it disables claim verdicts and agentic editing and says so in the
+UI, rather than faking output.
 
 | Env var | Default | Meaning |
 |---|---|---|
