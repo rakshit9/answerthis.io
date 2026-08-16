@@ -141,6 +141,9 @@ def get_rendered(paper_id: str, style: str | None = None):
     sections = [{
         "id": s.id, "title": s.title, "level": s.level, "kind": s.kind.value,
         "html": rend.render_text(s.content),
+        # Same text, but with each label still attached to its ref ids, so the
+        # reader can link a citation to its bibliography entry.
+        "paragraphs": rend.render_paragraphs(s.content),
     } for s in doc.sections if s.kind != SectionKind.REFERENCES]
     return {"style": rend.style_id, "sections": sections,
             "bibliography": rend.bibliography()}

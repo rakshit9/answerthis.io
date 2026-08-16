@@ -112,9 +112,19 @@ export interface EditProposal {
   created_at: number;
 }
 
+/** One piece of rendered prose: either plain text, or a citation label with
+ *  the references it stands for. */
+export type CitePart = { t?: string; label?: string; refs?: string[] };
+
 export interface RenderedDoc {
   style: string;
-  sections: { id: string; title: string; level: number; kind: string; html: string }[];
+  sections: {
+    id: string; title: string; level: number; kind: string;
+    html: string;
+    /** Same text as `html`, split into paragraphs of parts, with each
+     *  citation label still carrying the ref ids it stands for. */
+    paragraphs?: CitePart[][];
+  }[];
   bibliography: { ref_id: string; formatted: string; raw_fallback: boolean }[];
 }
 

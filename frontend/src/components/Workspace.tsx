@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import type {
-  EditProposal, Finding, Paper, Reference, RenderedDoc, ReviewRun,
+  CitePart, EditProposal, Finding, Paper, Reference, RenderedDoc, ReviewRun,
 } from "../types";
 import { Badge, SourceLine } from "./bits";
 import { DiffView } from "./diff";
@@ -171,6 +171,48 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
     if (prop && prop.status === "proposed") prop.changes.forEach((c) => m.set(c.section_id, c));
     return m;
   }, [prop]);
+
+  // ---- citation → bibliography, and back ----
+  /** Scroll an element into view, smoothly for a short hop.
+   *  A smooth scroll across a whole bibliography — tens of thousands of
+   *  pixels — is both slow to watch and fragile: the browser abandons the
+   *  animation when anything else touches the scroller mid-flight, and the
+   *  jump silently does nothing. Past a few screens, go straight there; the
+   *  flash on arrival is what tells the reader they moved. */
+  const scrollHere = (el: Element) => {
+    const far = Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 3;
+    el.scrollIntoView({ behavior: far ? "auto" : "smooth", block: "center" });
+  };
+
+  const [flashBib, setFlashBib] = useState<string[]>([]);
+  const [canReturn, setCanReturn] = useState(false);
+  const returnTo = useRef<HTMLElement | null>(null);
+
+  const citeTitle = useCallback((refs: string[]) => {
+    const names = refs.map((id) => {
+      const r = refsMap.get(id);
+      return (r?.csl.title as string) || r?.raw_text.slice(0, 80) || id;
+    });
+    return `${names.join("\n")}\n\nClick to show in the references`;
+  }, [refsMap]);
+
+  /** The references sit hundreds of lines below the prose, so a jump that
+   *  can't be undone loses the reader's place. Remember where they were and
+   *  offer the way back until they navigate somewhere else themselves. */
+  const jumpToBib = useCallback((refs: string[], from: HTMLElement) => {
+    const target = refs.map((r) => document.getElementById(`bib-${r}`)).find(Boolean);
+    if (!target) return;                       // unrenderable ref — nothing to show
+    returnTo.current = from;
+    setCanReturn(true);
+    scrollHere(target);
+    setFlashBib(refs);
+    window.setTimeout(() => setFlashBib([]), 2400);
+  }, []);
+
+  const backToText = useCallback(() => {
+    if (returnTo.current) scrollHere(returnTo.current);
+    setCanReturn(false);
+  }, []);
 
   const jumpTo = useCallback((sectionId: string) => {
     setView("reader");
@@ -395,7 +437,21 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                           <DiffView before={change.before} after={change.after} refs={refsMap} />
                         </div>
                       ) : (
-                        s.html.split("\n\n").map((p, i) => <p key={i}>{p}</p>)
+                        // paragraphs is the current shape; the html split is
+                        // the fallback for a response from an older backend.
+                        (s.paragraphs ?? s.html.split("\n\n")
+                          .map((t): CitePart[] => [{ t }]))
+                          .map((parts, i) => (
+                            <p key={i}>
+                              {parts.map((part, j) => part.refs
+                                ? <button key={j} className="cite-label"
+                                    title={citeTitle(part.refs)}
+                                    onClick={(e) => jumpToBib(part.refs!, e.currentTarget)}>
+                                    {part.label}
+                                  </button>
+                                : <span key={j}>{part.t}</span>)}
+                            </p>
+                          ))
                       )}
 
                       {(paper.floats ?? [])
@@ -416,9 +472,10 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                     </section>
                   );
                 })}
-                <h2>References</h2>
+                <h2 id="bib-top">References</h2>
                 {doc.bibliography.map((b) => (
-                  <div key={b.ref_id} className={`bib-entry ${b.raw_fallback ? "raw" : ""}`}>
+                  <div key={b.ref_id} id={`bib-${b.ref_id}`}
+                    className={`bib-entry ${b.raw_fallback ? "raw" : ""} ${flashBib.includes(b.ref_id) ? "flash-bib" : ""}`}>
                     <span className="bib-id">{b.ref_id}</span>
                     {b.formatted}
                     {b.raw_fallback && <span className="small"> — unparsed, raw text shown</span>}
@@ -428,6 +485,11 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
 
               <ReaderOutline sections={doc.sections} onJump={jumpTo} />
               </div>
+            )}
+            {canReturn && (
+              <button className="bib-return" onClick={backToText}>
+                ↑ Back to the text
+              </button>
             )}
           </div>
         )}

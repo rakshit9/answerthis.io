@@ -66,10 +66,12 @@ class Settings:
 
     # --- behaviour -----------------------------------------------------
     # Cap external searches per review run (rate-limit friendliness).
-    # Minimum wall-clock seconds an upload's parse takes end-to-end. The
-    # pipeline itself is fast; the pacing gives the live parse view time to
-    # narrate each stage. 0 disables (tests set this).
-    parse_min_seconds: float = float(_env("PIA_PARSE_MIN_SECONDS", "16"))
+    # Minimum wall-clock seconds an upload's parse takes end-to-end, padded
+    # across the stages. Off by default: the pipeline finishes a 24-page
+    # paper in a few seconds and the stage view keeps up, so padding it only
+    # makes the app feel slow. Set it (e.g. 12) to slow the narration down
+    # for a demo or a walkthrough recording.
+    parse_min_seconds: float = float(_env("PIA_PARSE_MIN_SECONDS", "0"))
     max_queries_per_review: int = int(_env("PIA_MAX_QUERIES_PER_REVIEW", "10"))
     max_claim_checks_per_review: int = int(_env("PIA_MAX_CLAIM_CHECKS", "12"))
     http_timeout_s: float = float(_env("PIA_HTTP_TIMEOUT", "20"))

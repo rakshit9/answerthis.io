@@ -91,6 +91,34 @@ class DocumentRenderer:
             return self.label_for(ids, narrative)
         return CITE_TOKEN_RE.sub(repl, token_text)
 
+    def render_paragraphs(self, token_text: str) -> list[list[dict]]:
+        """The same rendering as :meth:`render_text`, but keeping the join
+        between a label and the references it stands for.
+
+        Returns paragraphs of parts: ``{"t": "prose"}`` for text and
+        ``{"label": "(Smith, 2020)", "refs": ["ref_3"]}`` for a citation.
+        The reader needs the ref ids to link a label to its bibliography
+        entry, and handing the client structured parts keeps citation
+        formatting inside citeproc — the alternative, emitting HTML and
+        re-parsing it in the browser, would put a second citation renderer
+        in the frontend, which is exactly what this module exists to avoid.
+        """
+        paragraphs: list[list[dict]] = []
+        for para in token_text.split("\n\n"):
+            parts: list[dict] = []
+            pos = 0
+            for m in CITE_TOKEN_RE.finditer(para):
+                if m.start() > pos:
+                    parts.append({"t": para[pos:m.start()]})
+                ids = [r.strip() for r in m.group(2).split(",") if r.strip()]
+                parts.append({"label": self.label_for(ids, m.group(1) == "t"),
+                              "refs": ids})
+                pos = m.end()
+            if pos < len(para):
+                parts.append({"t": para[pos:]})
+            paragraphs.append(parts)
+        return paragraphs
+
     def bibliography(self) -> list[dict]:
         """[{ref_id, formatted, raw_fallback}] in style order; refs that
         couldn't be rendered come last with their raw text."""

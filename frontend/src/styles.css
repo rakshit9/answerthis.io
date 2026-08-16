@@ -519,8 +519,30 @@ h3 > svg { color: var(--muted); }
   line-height: 1.2; margin-top: var(--sp-32);
 }
 .reader h3 { font-size: 17px; font-weight: 500; }
-.reader .cite-label { color: var(--ink); border-bottom: 1px solid var(--accent); }
+/* A citation is a link to its reference, so it has to look clickable —
+   but inside body prose, not as a button pasted into a sentence: it keeps
+   the paragraph's font and baseline and carries only an accent underline. */
+.reader .cite-label {
+  font: inherit; color: var(--ink); background: none; border: none;
+  padding: 0; border-bottom: 1px solid var(--accent);
+  cursor: pointer; transition: background .14s;
+}
+.reader .cite-label:hover { background: var(--accent); }
 .reader .bib-entry { font-size: var(--text-body-sm); margin: var(--sp-8) 0; color: var(--muted); }
+.reader .bib-entry { scroll-margin-top: 80px; border-radius: var(--r-inner); }
+.reader .bib-entry.flash-bib {
+  color: var(--ink); animation: flashbg 2.4s ease-out;
+}
+/* Escape hatch: the bibliography is a long way from the prose. Anchored to
+   the pane's corner rather than the sheet, so it never sits on the text. */
+.bib-return {
+  position: absolute; right: var(--sp-24); bottom: var(--sp-24); z-index: 5;
+  background: var(--ink); color: var(--bg-soft); border: none;
+  padding: 9px 16px; border-radius: var(--r-pill);
+  font-size: var(--text-body-sm); font-weight: 500;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .16); animation: fadeUp .2s both;
+}
+.bib-return:hover { background: var(--accent); color: var(--ink); }
 .reader .bib-entry.raw { color: var(--warn); }
 .reader .bib-id { font-family: var(--mono); font-size: var(--text-caption); color: var(--faint); margin-right: var(--sp-8); }
 
@@ -672,6 +694,7 @@ select:focus { outline: none; border-color: var(--ink); }
 .paper-pane {
   flex: 1; min-width: 0; display: flex; flex-direction: column;
   border-right: 1px solid var(--line); background: var(--bg-soft);
+  position: relative;                 /* anchors .sel-bar and .bib-return */
 }
 .paper-pane-head {
   display: flex; align-items: center; gap: var(--sp-16); padding: var(--sp-12) var(--sp-24);

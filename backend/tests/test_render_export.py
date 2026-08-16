@@ -22,6 +22,30 @@ def test_apa_author_year_labels(simple_doc):
     assert "(Chen, 2019)" not in text.split("Chen (2019)")[0][-30:]
 
 
+def test_render_paragraphs_keeps_labels_joined_to_their_refs(simple_doc):
+    """The reader links a citation to its bibliography entry, so the parts
+    must carry ref ids — and must still reassemble into the flat rendering."""
+    rend = DocumentRenderer(simple_doc, "apa")
+    content = simple_doc.section_by_id("sec_2").content
+    paras = rend.render_paragraphs(content)
+
+    cited = [p for para in paras for p in para if p.get("refs")]
+    assert cited, "no citation parts produced"
+    assert all(p["label"] and p["refs"] for p in cited)
+    assert {"ref_1", "ref_3"} <= {r for p in cited for r in p["refs"]}
+
+    flat = "\n\n".join("".join(p.get("t") or p["label"] for p in para)
+                       for para in paras)
+    assert flat == rend.render_text(content)
+
+
+def test_render_paragraphs_splits_on_blank_lines(simple_doc):
+    rend = DocumentRenderer(simple_doc, "apa")
+    paras = rend.render_paragraphs("First para [[citep:ref_1]].\n\nSecond para.")
+    assert len(paras) == 2
+    assert paras[1] == [{"t": "Second para."}]
+
+
 def test_apa_bibliography_alphabetical(simple_doc):
     rend = DocumentRenderer(simple_doc, "apa")
     ids = [b["ref_id"] for b in rend.bibliography()]
