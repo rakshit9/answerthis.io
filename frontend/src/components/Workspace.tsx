@@ -37,6 +37,25 @@ const FINDING_GROUPS = [
   { id: "failed", label: "Failures", types: ["search_failure"] },
 ] as const;
 
+/** Collapse a section's findings to one entry per kind, most severe first,
+ *  keeping the titles for the tooltip and the panel group to filter to. */
+function summariseFindings(fs: Finding[]) {
+  const by = new Map<string, { label: string; severity: string; n: number; titles: string[]; group: string }>();
+  for (const f of fs) {
+    const label = f.type === "missing_work" ? "missing work"
+      : f.verdict ? (VERDICT_LABEL[f.verdict] ?? f.verdict)
+        : f.type.replace(/_/g, " ");
+    const hit = by.get(label);
+    if (hit) { hit.n += 1; hit.titles.push(f.title); continue; }
+    by.set(label, {
+      label, severity: f.severity, n: 1, titles: [f.title],
+      group: FINDING_GROUPS.find((g) => (g.types as readonly string[]).includes(f.type))?.id ?? "act",
+    });
+  }
+  return [...by.values()].sort(
+    (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
+}
+
 /** Ten identical "openalex quota exhausted" cards say nothing that one card
  *  and a count doesn't. Collapsing them keeps the failure visible — which is
  *  the point — without letting it drown the findings. */
@@ -472,12 +491,15 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                       </div>
 
                       {secFindings.length > 0 && (
+                        // One chip per *kind*, carrying a count. Eight chips
+                        // under a heading is a wall the eye skips; two with
+                        // numbers is a summary it reads.
                         <div className="finding-inline">
-                          {secFindings.map((f) => (
-                            <button key={f.id} className={`fdot ${f.severity}`}
-                              title={f.title}
-                              onClick={() => setPanel("review")}>
-                              {f.type === "missing_work" ? "missing work" : f.verdict ? (VERDICT_LABEL[f.verdict] ?? f.verdict) : f.type.replace(/_/g, " ")}
+                          {summariseFindings(secFindings).map((k) => (
+                            <button key={k.label} className={`fdot ${k.severity}`}
+                              title={k.titles.join("\n")}
+                              onClick={() => { setPanel("review"); setGroup(k.group); }}>
+                              {k.label}{k.n > 1 && <b> {k.n}</b>}
                             </button>
                           ))}
                         </div>

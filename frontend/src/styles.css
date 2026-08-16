@@ -914,6 +914,11 @@ section.flash { animation: flashbg 1.8s ease-out; border-radius: var(--r-inner);
 .fdot.medium::before { background: var(--warn); }
 .fdot.info { border-color: var(--ink); color: var(--ink); }
 .fdot.info::before { background: var(--accent); border: 1px solid var(--ink); }
+.fdot b {
+  font-weight: 600; margin-left: 1px;
+  font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+.fdot:hover { border-color: var(--ink); color: var(--ink); }
 
 .inline-change {
   border: 1px solid var(--ink); border-radius: var(--r-inner);
