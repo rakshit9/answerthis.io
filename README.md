@@ -31,6 +31,79 @@ export. Built with [Remotion](https://github.com/remotion-dev/remotion) —
 source and script in [`video/`](video), screenshots in
 [`screenshots/`](screenshots).
 
+## System design
+
+The two pieces the brief asks about — **citation parsing** and **the agent** —
+with the full write-up and all eight diagrams in
+**[`docs/system-design.md`](docs/system-design.md)**. The shape of the whole
+system:
+
+```mermaid
+flowchart LR
+    PDF[/"PDF upload"/] --> GATE{{"A0 · readability gate"}}
+    GATE -->|"encrypted · no text layer"| REJECT["refused with a reason<br/>(never an empty parse)"]
+
+    subgraph Parsing["1 · Citation parsing — deterministic, no LLM"]
+        direction TB
+        GATE -->|readable| A["A · layout extraction"]
+        A --> AF["A′ · float capture"]
+        AF --> B["B · structure"]
+        B --> C["C · reference list"]
+        C --> D["D · entry parsing"]
+        B --> E["E · in-text markers"]
+        D --> E
+    end
+
+    E --> DOC[("PaperDocument<br/><b>the canonical model</b><br/>sections carry citation tokens<br/>references are CSL-JSON")]
+
+    subgraph Agent["2 · The agent — LLM-planned, API-grounded, human-approved"]
+        direction TB
+        REV["peer review<br/>missing work · claim checks"]
+        EDIT["NL editing<br/>plan → typed ops"]
+        PROP["EditProposal<br/>diffs + new refs + step log"]
+        INT{{"citation-integrity check<br/>I1 · I2 · I3"}}
+        OK["per-change human approval"]
+        REV -.->|"“Cite this”"| PROP
+        EDIT --> PROP --> INT
+        INT -->|violation| BLOCKED["unapplyable by construction"]
+        INT -->|clean| OK
+    end
+
+    DOC --> REV
+    DOC --> EDIT
+    OK --> APPLY["snapshot version → apply<br/>→ recompute in-text"] --> DOC
+
+    subgraph Ext["External boundary — one client, cached, rate-limited"]
+        S2[("Semantic Scholar")]
+        OA[("OpenAlex")]
+    end
+    REV <--> Ext
+    EDIT <--> Ext
+
+    DOC --> RENDER["citeproc + vendored .csl"]
+    RENDER --> READER["reader view"]
+    RENDER --> EXPORT["LaTeX · BibTeX · Markdown · provenance"]
+
+    style DOC fill:#beff50,stroke:#14140f,color:#14140f
+    style REJECT stroke-dasharray: 4 3
+    style BLOCKED stroke-dasharray: 4 3
+```
+
+Two invariants hold it together, and every arrow above is arranged to protect
+them:
+
+| Invariant | Enforced by |
+|---|---|
+| No citation is invented — every one traces to a real record | the external boundary is the *only* source of new references; integrity rule **I3** rejects any that arrives without provenance |
+| No edit silently breaks a citation | citations live as **tokens** inside the text; rules **I1/I2** compare token multisets before and after, and a violating proposal cannot be applied |
+
+**Read next:** [citation parsing](docs/system-design.md#piece-1--citation-parsing)
+— pipeline stages, the intermediate representation between each, where
+CSL-JSON sits, style detection and failure handling ·
+[the agent](docs/system-design.md#piece-2--the-agent) — command → typed
+operations, the Semantic Scholar / OpenAlex boundary, peer review, and how
+citations stay intact across edits.
+
 ## Run it — Docker
 
 Nothing but Docker needed (Compose v2). One process serves both the API and
