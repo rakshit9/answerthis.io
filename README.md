@@ -8,6 +8,22 @@ as LaTeX. Citations are canonically **CSL-JSON**, rendered through
 checker: no edit can silently drop a citation, and no citation can enter the
 system without a real, linkable source.
 
+## Watch it
+
+[![Feature tour](screenshots/00_video_poster.png)](screenshots/feature-tour.mp4)
+
+**[▶ Feature tour — 3.8 min, with narration](screenshots/feature-tour.mp4)**
+*(GitHub won't play it inline from a repo path — click through, or download
+the file.)*
+
+The whole workflow on a real 24-page paper: upload and the six parse stages,
+what the parser found and what it refused, citations as links, peer review
+against live academic search, accepting a finding as a citation, editing by
+command with the diff and integrity check, the editable LaTeX view, and
+export. Built with [Remotion](https://github.com/remotion-dev/remotion) —
+source and script in [`video/`](video), screenshots in
+[`screenshots/`](screenshots).
+
 ## Run it — Docker
 
 Nothing but Docker needed (Compose v2). One process serves both the API and

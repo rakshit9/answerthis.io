@@ -1,5 +1,11 @@
 # Workflow screenshots
 
+**[`feature-tour.mp4`](feature-tour.mp4)** — the 3.8-minute narrated
+walkthrough, rendered from [`../video`](../video).
+[`00_video_poster.png`](00_video_poster.png) is its opening frame, used as the
+poster in the top-level README.
+
+
 Captured **2026-08-16** against the Docker build (`docker compose up`), driving
 the real app with Playwright — a real 24-page ICML position paper, a real
 completed review, real sources. Nothing is mocked or staged.
