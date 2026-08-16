@@ -603,6 +603,60 @@ button.ghost:hover { color: var(--ink); }
 .checklabel { font-size: var(--text-body-sm); color: var(--muted); display: inline-flex; gap: var(--sp-8); align-items: center; }
 input[type="checkbox"] { accent-color: var(--ink); }
 
+/* The run controls are one thing — an action and what it covers — so they
+   sit in one card instead of floating loose above the results. */
+.runbox {
+  background: var(--color-pure-white); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: var(--sp-16);
+  display: flex; flex-direction: column; gap: var(--sp-12);
+}
+.checkrow { display: flex; align-items: center; gap: var(--sp-8); flex-wrap: wrap; }
+.checkrow-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--faint); margin-right: var(--sp-4);
+}
+.toggle {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  padding: 5px 12px 5px 10px; font-size: var(--text-body-sm); color: var(--muted);
+  transition: border-color .14s, color .14s, background .14s;
+}
+.toggle.on { border-color: var(--ink); color: var(--ink); background: var(--bg-soft); }
+.toggle input { margin: 0; }
+
+/* Log: a disclosure, not a wall. Open while running, folded when done. */
+.runlog { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--color-pure-white); }
+.runlog > summary {
+  cursor: pointer; list-style: none; padding: 10px var(--sp-16);
+  font-size: var(--text-body-sm); color: var(--muted);
+  display: flex; align-items: center; gap: var(--sp-8);
+}
+.runlog > summary::-webkit-details-marker { display: none; }
+.runlog > summary::after { content: "▾"; margin-left: auto; color: var(--faint); font-size: 10px; }
+.runlog[open] > summary::after { content: "▴"; }
+.runlog > summary:hover { color: var(--ink); }
+.runlog .progress-log { margin: 0 var(--sp-8) var(--sp-8); }
+
+/* Findings, grouped. Counts are the point — they say where the work is. */
+.fgroups { display: flex; flex-wrap: wrap; gap: 6px; }
+.fgroup {
+  border: 1px solid var(--line); background: var(--color-pure-white);
+  border-radius: var(--r-pill); padding: 5px 12px;
+  font-size: var(--text-body-sm); color: var(--muted);
+  display: inline-flex; align-items: baseline; gap: 6px;
+  transition: border-color .14s, color .14s, background .14s;
+}
+.fgroup b { font-weight: 500; color: var(--ink); }
+.fgroup:hover { border-color: var(--ink); color: var(--ink); }
+.fgroup.on { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+.fgroup.on b { color: var(--ink); }
+.fgroup.clear { border-style: dashed; }
+.finding .repeats {
+  font-family: var(--mono); font-size: var(--text-caption); color: var(--muted);
+  background: var(--bg-soft); border-radius: var(--r-pill);
+  padding: 1px 7px; margin-right: var(--sp-4);
+}
+
 /* ============================== edit panel ============================== */
 .cmd { display: flex; gap: var(--sp-8); }
 .cmd input {
@@ -639,6 +693,35 @@ input[type="checkbox"] { accent-color: var(--ink); }
   background: var(--accent); border: 1px solid var(--ink); flex-shrink: 0;
 }
 .integrity.fail { border-color: var(--bad); color: var(--bad); }
+/* Proposal: what it would do, before how it got there. */
+.prop-head { display: flex; align-items: baseline; gap: var(--sp-8); flex-wrap: wrap; }
+.prop-cmd { font-size: var(--text-body-sm); font-weight: 500; }
+.prop-stats {
+  display: flex; align-items: center; gap: var(--sp-16); flex-wrap: wrap;
+  margin-top: var(--sp-12); padding-top: var(--sp-12);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-body-sm); color: var(--muted);
+}
+.prop-stats b { color: var(--ink); font-weight: 500; }
+.prop-stats .ok, .prop-stats .bad { display: inline-flex; align-items: center; gap: 5px; }
+.prop-stats .ok { color: var(--ink); }
+.prop-stats .bad { color: var(--bad); }
+.prop-plan { margin: var(--sp-12) 0 2px; }
+.prop-jumps { margin: var(--sp-12) 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.prop-sources { margin-top: var(--sp-16); }
+.prop-sources h3 { margin: 0 0 var(--sp-8); }
+.source-card { margin-bottom: var(--sp-8); padding: 10px 12px; }
+
+.steps > summary {
+  cursor: pointer; list-style: none; margin-top: var(--sp-12);
+  font-size: var(--text-body-sm); color: var(--muted);
+  display: flex; align-items: center; gap: var(--sp-8);
+}
+.steps > summary::-webkit-details-marker { display: none; }
+.steps > summary::after { content: "▾"; color: var(--faint); font-size: 10px; }
+.steps[open] > summary::after { content: "▴"; }
+.steps > summary:hover { color: var(--ink); }
+
 .step-log { margin: var(--sp-12) 0; padding-left: var(--sp-4); list-style: none; }
 .step-log li { margin: var(--sp-4) 0; font-size: var(--text-body-sm); }
 .step-log .k {

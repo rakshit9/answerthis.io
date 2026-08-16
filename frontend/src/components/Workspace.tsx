@@ -24,10 +24,39 @@ const VERDICT_LABEL: Record<string, string> = {
 };
 
 const SEV_TONE: Record<string, string> = { high: "bad", medium: "warn", info: "good" };
+const SEV_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, info: 3 };
 
-function FindingCard({ f, onJump, onCite, citing, citeError }: {
+/** Findings arrive as one flat list, but they answer different questions.
+ *  A run on a real paper is ~40 findings, of which the ~8 you can act on
+ *  are buried under parser bookkeeping. Grouping is what makes the panel
+ *  readable; nothing is hidden, it just stops competing for attention. */
+const FINDING_GROUPS = [
+  { id: "act", label: "Act on", types: ["missing_work", "claim_mismatch"] },
+  { id: "checked", label: "Checked", types: ["claim_supported", "claim_unverifiable"] },
+  { id: "refs", label: "References", types: ["unparsed_reference", "unresolved_reference", "style_note"] },
+  { id: "failed", label: "Failures", types: ["search_failure"] },
+] as const;
+
+/** Ten identical "openalex quota exhausted" cards say nothing that one card
+ *  and a count doesn't. Collapsing them keeps the failure visible — which is
+ *  the point — without letting it drown the findings. */
+function collapseRepeats(findings: Finding[]): { f: Finding; n: number }[] {
+  const out: { f: Finding; n: number }[] = [];
+  const seen = new Map<string, number>();
+  for (const f of findings) {
+    if (f.type !== "search_failure") { out.push({ f, n: 1 }); continue; }
+    const key = `${f.title}|${(f.detail ?? "").slice(0, 90)}`;
+    const at = seen.get(key);
+    if (at === undefined) { seen.set(key, out.length); out.push({ f, n: 1 }); }
+    else out[at].n += 1;
+  }
+  return out;
+}
+
+function FindingCard({ f, onJump, onCite, citing, citeError, repeats = 1 }: {
   f: Finding; onJump: (sectionId: string) => void;
   onCite?: (f: Finding) => void; citing?: boolean; citeError?: string | null;
+  repeats?: number;
 }) {
   // Only a missing-work finding with a real source is actionable: the others
   // are observations about the paper, not works it could cite.
@@ -36,6 +65,7 @@ function FindingCard({ f, onJump, onCite, citing, citeError }: {
     <div className={`card finding ${f.severity}`}>
       <div className="ftitle">
         <Badge tone={SEV_TONE[f.severity] ?? ""}>{f.type.replace(/_/g, " ")}</Badge>
+        {repeats > 1 && <span className="repeats" title={`${repeats} identical occurrences`}>×{repeats}</span>}
         {f.title}
       </div>
       {f.section_id && f.section_title && (
@@ -90,6 +120,7 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
   const [starting, setStarting] = useState(false);
   const [citing, setCiting] = useState<string | null>(null);       // finding id
   const [citeError, setCiteError] = useState<{ id: string; msg: string } | null>(null);
+  const [group, setGroup] = useState<string | null>(null);         // findings filter
   const reviewTimer = useRef<number | null>(null);
 
   // ---- manual in-place editing ----
@@ -183,6 +214,17 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paper.id]);
+
+  /** What the findings list actually shows: the selected group (or all),
+   *  most severe first, with identical repeats folded into one card. */
+  const visibleFindings = useMemo(() => {
+    const all = run?.findings ?? [];
+    const g = FINDING_GROUPS.find((x) => x.id === group);
+    const picked = g ? all.filter((f) => (g.types as readonly string[]).includes(f.type)) : all;
+    const sorted = [...picked].sort(
+      (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
+    return collapseRepeats(sorted);
+  }, [run, group]);
 
   const refsMap = useMemo(() => {
     const m = new Map<string, Reference>();
@@ -567,47 +609,81 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                 <Icon.alert size={14} /> No LLM — claim verdicts disabled.
               </div>
             )}
-            <div className="runbar">
-              <button className="primary" onClick={() => void startReview()} disabled={reviewRunning || starting}>
-                {reviewRunning ? <><span className="spin" />Running…</> : <><Icon.search size={15} /> Run review</>}
-              </button>
-              {runs.length > 1 && (
-                <select value={run?.id ?? ""} onChange={(e) => {
-                  const r = runs.find((x) => x.id === e.target.value);
-                  if (r) setRun(r);
-                }}>
-                  {runs.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {new Date(r.started_at * 1000).toLocaleTimeString()} — {r.status} ({r.findings.length})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="checkrow">
-              <label className="checklabel">
-                <input type="checkbox" checked={missingWork} onChange={(e) => setMissingWork(e.target.checked)} />
-                missing work
-              </label>
-              <label className="checklabel">
-                <input type="checkbox" checked={claimChecks} onChange={(e) => setClaimChecks(e.target.checked)} />
-                claim–citation checks
-              </label>
+            <div className="runbox">
+              <div className="runbar">
+                <button className="primary" onClick={() => void startReview()} disabled={reviewRunning || starting}>
+                  {reviewRunning ? <><span className="spin" />Running…</> : <><Icon.search size={15} /> Run review</>}
+                </button>
+                {runs.length > 1 && (
+                  <select value={run?.id ?? ""} onChange={(e) => {
+                    const r = runs.find((x) => x.id === e.target.value);
+                    if (r) setRun(r);
+                  }}>
+                    {runs.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {new Date(r.started_at * 1000).toLocaleTimeString()} — {r.status} ({r.findings.length})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="checkrow">
+                <span className="checkrow-label">check</span>
+                <label className={`toggle ${missingWork ? "on" : ""}`}>
+                  <input type="checkbox" checked={missingWork} onChange={(e) => setMissingWork(e.target.checked)} />
+                  missing work
+                </label>
+                <label className={`toggle ${claimChecks ? "on" : ""}`}>
+                  <input type="checkbox" checked={claimChecks} onChange={(e) => setClaimChecks(e.target.checked)} />
+                  claim–citation
+                </label>
+              </div>
             </div>
 
+            {/* The stage log matters while it runs and is reference material
+                afterwards, so it opens itself and then gets out of the way. */}
             {run && (reviewRunning || run.progress.length > 0) && (
-              <div className="progress-log">
-                {run.progress.slice(-14).map((p, i) => <div key={i}>{p}</div>)}
-                {reviewRunning && <div><span className="spin" /> working…</div>}
-              </div>
+              <details className="runlog" open={reviewRunning}>
+                <summary>
+                  {reviewRunning
+                    ? <><span className="spin" /> {run.progress[run.progress.length - 1]?.replace(/^\[[^\]]+\]\s*/, "") ?? "working…"}</>
+                    : <>Run log · {run.progress.length} steps</>}
+                </summary>
+                <div className="progress-log">
+                  {run.progress.map((p, i) => <div key={i}>{p}</div>)}
+                </div>
+              </details>
             )}
             {run?.error && <div className="error-banner">{run.error}</div>}
 
-            {run && run.findings.map((f) => (
-              <FindingCard key={f.id} f={f} onJump={jumpTo} onCite={citeFinding}
-                citing={citing === f.id}
-                citeError={citeError?.id === f.id ? citeError.msg : null} />
-            ))}
+            {run && run.findings.length > 0 && (
+              <>
+                <div className="fgroups">
+                  {FINDING_GROUPS.map((g) => {
+                    const n = run.findings.filter((f) => (g.types as readonly string[]).includes(f.type)).length;
+                    if (!n) return null;
+                    return (
+                      <button key={g.id}
+                        className={`fgroup ${group === g.id ? "on" : ""}`}
+                        onClick={() => setGroup(group === g.id ? null : g.id)}>
+                        {g.label} <b>{n}</b>
+                      </button>
+                    );
+                  })}
+                  {group && (
+                    <button className="fgroup clear" onClick={() => setGroup(null)}>
+                      show all {run.findings.length}
+                    </button>
+                  )}
+                </div>
+
+                {visibleFindings.map(({ f, n }) => (
+                  <FindingCard key={f.id} f={f} onJump={jumpTo} onCite={citeFinding}
+                    repeats={n} citing={citing === f.id}
+                    citeError={citeError?.id === f.id ? citeError.msg : null} />
+                ))}
+              </>
+            )}
             {run && run.status === "done" && run.findings.length === 0 && (
               <div className="empty"><EmptyArt kind="review" /><p>No findings.</p></div>
             )}
@@ -648,12 +724,24 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
 
             {prop && (
               <div className="prop-summary">
-                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                  <strong className="small">“{prop.command}”</strong>
+                <div className="prop-head">
                   <Badge tone={prop.status === "applied" ? "good" : prop.status === "failed" ? "bad" : prop.status === "proposed" ? "accent" : ""}>
                     {prop.status}
                   </Badge>
+                  <strong className="prop-cmd">“{prop.command}”</strong>
                 </div>
+                {/* Counts first: what this proposal would do to the paper. */}
+                {!editRunning && prop.status !== "failed" && (
+                  <div className="prop-stats">
+                    <span><b>{prop.changes.length}</b> section{prop.changes.length === 1 ? "" : "s"}</span>
+                    <span><b>{prop.new_references.length}</b> new source{prop.new_references.length === 1 ? "" : "s"}</span>
+                    <span className={prop.integrity.ok ? "ok" : "bad"}>
+                      {prop.integrity.ok
+                        ? <><Icon.check size={12} /> citations intact</>
+                        : <><Icon.alert size={12} /> {prop.integrity.violations.length} violation(s)</>}
+                    </span>
+                  </div>
+                )}
                 {proposals.length > 1 && (
                   <select value={prop.id} onChange={(e) => {
                     const p = proposals.find((x) => x.id === e.target.value);
@@ -664,20 +752,25 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                     ))}
                   </select>
                 )}
-                {prop.plan && <p className="small" style={{ margin: "6px 0 2px" }}><strong>Plan:</strong> {prop.plan}</p>}
+                {prop.plan && <p className="small prop-plan"><strong>Plan:</strong> {prop.plan}</p>}
                 {prop.steps.length > 0 && (
-                  <ul className="step-log">
-                    {prop.steps.map((s, i) => (
-                      <li key={i}><span className="k">{s.kind}</span>{s.text}</li>
-                    ))}
-                    {editRunning && <li><span className="spin" /> …</li>}
-                  </ul>
+                  // Open while the agent works — that is when the log is the
+                  // interesting part — then collapsed to keep the result on top.
+                  <details className="steps" open={editRunning}>
+                    <summary>Agent log · {prop.steps.length} steps</summary>
+                    <ul className="step-log">
+                      {prop.steps.map((s, i) => (
+                        <li key={i}><span className="k">{s.kind}</span>{s.text}</li>
+                      ))}
+                      {editRunning && <li><span className="spin" /> …</li>}
+                    </ul>
+                  </details>
                 )}
                 {prop.error && <div className="error-banner">{prop.error}</div>}
 
                 {prop.status === "proposed" && prop.changes.length > 0 && (
-                  <div className="small" style={{ margin: "8px 0" }}>
-                    <span className="muted">{prop.changes.length} diff{prop.changes.length === 1 ? "" : "s"} inline — approve there.</span>
+                  <div className="small prop-jumps">
+                    <span className="muted">Diffs are inline — approve them there.</span>
                     {prop.changes.map((c) => (
                       <button key={c.id} className="jump" onClick={() => jumpTo(c.section_id)}>
                         ↦ {c.section_title}
@@ -687,12 +780,12 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
                 )}
 
                 {prop.new_references.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <h3 style={{ margin: "0 0 6px" }}><Icon.link /> New sources ({prop.new_references.length})</h3>
+                  <div className="prop-sources">
+                    <h3><Icon.link /> New sources ({prop.new_references.length})</h3>
                     {prop.citation_adds.map((a) => {
                       const r = prop.new_references.find((x) => x.id === a.ref_id);
                       return (
-                        <div key={a.ref_id} className="card" style={{ marginBottom: 8, padding: "10px 12px" }}>
+                        <div key={a.ref_id} className="card source-card">
                           {r && r.resolution.source_url && (
                             <SourceLine s={{
                               api: a.api, api_id: r.resolution.source_id ?? "",
