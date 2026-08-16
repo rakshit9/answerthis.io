@@ -1,0 +1,27 @@
+# Build inputs only — everything here is either rebuilt in the image,
+# host-specific, or must never be baked into a layer.
+
+.git
+.gitignore
+.claude
+
+# secrets: passed at run time via env_file / -e, never copied in
+**/.env
+
+# rebuilt inside the image
+frontend/node_modules
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+backend/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+
+# user data — mounted as a volume, not baked in (it is also large)
+backend/data
+
+# not needed to run the app
+screenshots
+docs
+README.md
+scripts

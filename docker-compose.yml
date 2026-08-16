@@ -1,0 +1,25 @@
+# docker compose up --build   → http://localhost:8000
+#
+# One service, because the app is one process: uvicorn serves both the API and
+# the built frontend.
+
+services:
+  app:
+    build: .
+    image: paper-improvement-agent
+    ports:
+      - "${PIA_PORT:-8000}:8000"
+
+    # Keys are read from backend/.env at run time, never baked into the image
+    # (.dockerignore excludes it from the build context). Optional, so the app
+    # still starts on a fresh clone with no .env — it degrades honestly and
+    # says so at /api/health.
+    env_file:
+      - path: backend/.env
+        required: false
+
+    # Parsed papers, review runs and proposals persist across restarts.
+    volumes:
+      - ./backend/data:/app/backend/data
+
+    restart: unless-stopped

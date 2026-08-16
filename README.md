@@ -8,15 +8,49 @@ as LaTeX. Citations are canonically **CSL-JSON**, rendered through
 checker: no edit can silently drop a citation, and no citation can enter the
 system without a real, linkable source.
 
-## Run it
+## Run it — Docker
 
-Requirements: Python 3.11+, Node 18+. Verified from a clean clone.
+Nothing but Docker needed (Compose v2). One process serves both the API and
+the built frontend. Verified end to end: image builds, container reports
+healthy, a real PDF parses inside it.
+
+```bash
+cp backend/.env.example backend/.env   # optional: add an OpenAI key, see Keys
+docker compose up --build
+```
+
+Open **http://localhost:8000** and drop a PDF on the first screen. arXiv
+papers work best — their references resolve on both APIs:
+
+```bash
+curl -L -o paper.pdf https://arxiv.org/pdf/1706.03762
+```
+
+Parsed papers live in `backend/data/`, mounted as a volume, so they survive
+`docker compose down`. Keys are read from `backend/.env` at run time and are
+never baked into the image. Use another port with `PIA_PORT=9000 docker
+compose up`.
+
+```bash
+docker compose up -d --build     # background
+docker compose logs -f           # follow logs
+docker compose down              # stop (papers persist)
+```
+
+Updating is `git pull && docker compose up --build -d`. Dependency changes
+rebuild automatically; the layer order means editing Python or TSX doesn't
+reinstall anything.
+
+## Run it — without Docker
+
+For frontend hot-reload while developing. Requirements: Python 3.11+, Node
+18+.
 
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # optional: add an OpenAI key, see Keys below
+cp .env.example .env
 uvicorn app.main:app --port 8000
 ```
 
@@ -28,20 +62,15 @@ npm install
 npm run dev                   # → http://localhost:5173, proxies /api to :8000
 ```
 
-Open **http://localhost:5173** and drop a PDF on the first screen. arXiv
-papers work best — their references resolve on both APIs:
-
-```bash
-curl -L -o paper.pdf https://arxiv.org/pdf/1706.03762
-```
-
-**Single process instead:** `npm run build` in `frontend/`, then the same
-uvicorn command serves the built app at http://localhost:8000.
+`PIA_BACKEND_URL` repoints the dev server if the backend isn't on :8000.
+For a single process instead, `npm run build` in `frontend/` and the uvicorn
+command above serves the built app at http://localhost:8000.
 
 **Tests:**
 
 ```bash
 cd backend && .venv/bin/python -m pytest tests/    # 116 tests, no network
+docker compose run --rm app python -m pytest tests/    # or in the image
 ```
 
 ## Keys
@@ -130,4 +159,6 @@ backend/app/
   api/        FastAPI routes; store.py = on-disk JSON persistence
 backend/tests/  116 pytest tests incl. synthetic-PDF integration + float capture
 frontend/       React + TS: upload → parse → read → review → edit (diff+approve) → export
+Dockerfile      two stages: node builds the frontend, python runs one uvicorn over both
+docker-compose.yml   one service; backend/data as a volume, backend/.env at run time
 ```
