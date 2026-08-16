@@ -24,7 +24,7 @@ import time
 import zipfile
 
 from ..cslproc.render import DocumentRenderer, renderable
-from ..models.core import CITE_TOKEN_RE, PaperDocument, SectionKind
+from ..models.core import CITE_TOKEN_RE, FloatKind, PaperDocument, SectionKind
 from .bibtex import bibliography_to_bibtex
 
 _TEX_SPECIALS = {"&": r"\&", "%": r"\%", "#": r"\#", "_": r"\_"}
@@ -82,6 +82,11 @@ def build_latex(doc: PaperDocument, style_id: str | None = None) -> dict[str, st
     lines.append(r"\begin{document}")
     lines.append(r"\maketitle")
 
+    floats_by_section: dict[str, list] = {}
+    for fl in doc.floats:
+        floats_by_section.setdefault(fl.section_id or "", []).append(fl)
+    emitted: set[str] = set()
+
     for sec in doc.sections:
         if sec.kind == SectionKind.REFERENCES:
             continue
@@ -97,6 +102,20 @@ def build_latex(doc: PaperDocument, style_id: str | None = None) -> dict[str, st
         lines.append(f"{cmd}{{{_tex_escape(sec.title)}}}")
         if body.strip():
             lines.append(body)
+        for fl in floats_by_section.get(sec.id, []):
+            lines.extend(_tex_float(fl, author_year))
+            emitted.add(fl.id)
+
+    # Any float not emitted above still ships: its anchor section was
+    # unknown, or was a section the exporter skips (e.g. References).
+    # Dropping it would silently lose text the parser deliberately kept.
+    leftover = [f for f in doc.floats if f.id not in emitted]
+    if leftover:
+        lines.append(r"\section*{Unanchored floats}")
+        lines.append("% Captured from the PDF but not attachable to an exported "
+                     "section; text preserved here rather than dropped.")
+        for fl in leftover:
+            lines.extend(_tex_float(fl, author_year))
 
     # ---- bibliography: citeproc-rendered text, CSL-ordered -------------
     bib = rend.bibliography()
@@ -128,6 +147,39 @@ def build_latex(doc: PaperDocument, style_id: str | None = None) -> dict[str, st
     }
 
 
+def _tex_float(fl, author_year: bool) -> list[str]:
+    """A captured float as a LaTeX environment.
+
+    The parser preserves a float's *text*, not its visual layout, so the
+    emitted environment says so in a comment rather than pretending to
+    reconstruct a figure. A ruled table's cells survive as a tabular-ish
+    verbatim block: honest, and editable by hand downstream.
+    """
+    env = {FloatKind.TABLE: "table", FloatKind.FIGURE: "figure"}.get(fl.kind)
+    out: list[str] = []
+    body = _tex_body(fl.text, author_year).strip()
+    caption = _tex_escape(fl.caption).strip()
+    if env is None:                       # boxed panel — no float environment
+        out.append(r"\begin{quote}")
+        out.append(f"% {fl.id}: boxed panel captured from page {fl.page + 1}; "
+                   "text preserved, original framing not reconstructed")
+        if caption:
+            out.append(rf"\textbf{{{caption}}}")
+        out.append(body)
+        out.append(r"\end{quote}")
+        return out
+    out.append(rf"\begin{{{env}}}[htbp]")
+    out.append(f"% {fl.id}: {fl.kind.value} captured from page {fl.page + 1}; "
+               "text preserved, visual layout not reconstructed")
+    out.append(r"\centering")
+    if body:
+        out.append(body)
+    if caption:
+        out.append(rf"\caption{{{caption}}}")
+    out.append(rf"\end{{{env}}}")
+    return out
+
+
 def _natbib_label(ref) -> str:
     fams = [a.split(",")[0].strip() for a in ref.parsed.authors[:3]]
     year = ref.parsed.year or "n.d."
@@ -145,6 +197,7 @@ def _natbib_label(ref) -> str:
 def build_markdown(doc: PaperDocument, style_id: str | None = None) -> str:
     rend = DocumentRenderer(doc, style_id or doc.csl_style)
     out = [f"# {doc.meta.title}", ""]
+    md_emitted: set[str] = set()
     if doc.meta.authors:
         out += [", ".join(doc.meta.authors), ""]
     for sec in doc.sections:
@@ -154,6 +207,30 @@ def build_markdown(doc: PaperDocument, style_id: str | None = None) -> str:
         out.append("")
         if sec.content.strip():
             out.append(rend.render_text(sec.content))
+            out.append("")
+        for fl in doc.floats:
+            if fl.section_id != sec.id:
+                continue
+            md_emitted.add(fl.id)
+            label = fl.caption or f"{fl.kind.value.title()} (page {fl.page + 1})"
+            out.append(f"> **{label}**")
+            out.append(">")
+            for para in fl.text.split("\n\n"):
+                out.append("> " + para.replace("\n", "\n> "))
+                out.append(">")
+            out.append("> _text preserved; original layout not reconstructed_")
+            out.append("")
+    leftover = [f for f in doc.floats if f.id not in md_emitted]
+    if leftover:
+        out.append("## Unanchored floats")
+        out.append("")
+        for fl in leftover:
+            label = fl.caption or f"{fl.kind.value.title()} (page {fl.page + 1})"
+            out.append(f"> **{label}**")
+            out.append(">")
+            for para in fl.text.split("\n\n"):
+                out.append("> " + para.replace("\n", "\n> "))
+                out.append(">")
             out.append("")
     out.append("## References")
     out.append("")

@@ -160,6 +160,27 @@ class Section(BaseModel):
     page_end: Optional[int] = None
 
 
+class FloatKind(str, Enum):
+    FIGURE = "figure"
+    TABLE = "table"
+    BOX = "box"            # bordered/filled panel (tcolorbox, framed defs, …)
+
+
+class FloatBlock(BaseModel):
+    """A figure, table, or boxed panel captured out of the prose flow.
+
+    The parser cannot reconstruct visual layout from a PDF, so the honest
+    contract is: the float's *text* is preserved here (never silently
+    dropped) and excluded from section prose, where it would otherwise
+    bleed into paragraphs as garbled inline text."""
+    id: str
+    kind: FloatKind
+    caption: str = ""
+    text: str = ""                         # extracted text, layout not preserved
+    page: int                              # 0-based
+    section_id: Optional[str] = None       # section whose prose surrounds it
+
+
 class ParseWarning(BaseModel):
     stage: str                             # which pipeline stage raised it
     message: str
@@ -177,6 +198,7 @@ class ParseReport(BaseModel):
     n_references_unparsed: int = 0
     n_intext_citations: int = 0
     n_intext_unmatched: int = 0
+    n_floats: int = 0
     intext_style: IntextStyle = IntextStyle.UNKNOWN
     intext_style_confidence: float = 0.0
 
@@ -202,6 +224,7 @@ class PaperDocument(BaseModel):
     uploaded_at: float = Field(default_factory=time.time)
     meta: PaperMeta = Field(default_factory=PaperMeta)
     sections: list[Section] = Field(default_factory=list)
+    floats: list[FloatBlock] = Field(default_factory=list)
     references: list[Reference] = Field(default_factory=list)
     intext_citations: list[InTextCitation] = Field(default_factory=list)
     parse_report: ParseReport = Field(default_factory=ParseReport)

@@ -1,10 +1,12 @@
 """Parsing pipeline orchestrator: PDF file → ``PaperDocument``.
 
-  A. pdf_extract.extract_document   PDF → ordered styled lines
-  B. structure.build_structure      lines → title/abstract/sections
-  C. reflist.segment_references     references section → raw entries
-  D. refparse.parse_entry/to_csl    raw entry → fields → CSL-JSON
-  E. intext.tokenize_sections       body text → [[citep/citet:…]] tokens
+  A.  pdf_extract.extract_document  PDF → ordered styled lines
+  A′. floats.detect_floats          figures/tables/boxed panels captured
+                                    out of the prose flow (text preserved)
+  B.  structure.build_structure     lines → title/abstract/sections
+  C.  reflist.segment_references    references section → raw entries
+  D.  refparse.parse_entry/to_csl   raw entry → fields → CSL-JSON
+  E.  intext.tokenize_sections      body text → [[citep/citet:…]] tokens
 
 The resulting document carries a ``ParseReport`` that records every stage,
 every warning, and exact counts of what was and wasn't parsed — the UI
@@ -12,9 +14,9 @@ shows this verbatim.
 """
 from __future__ import annotations
 
-from ..models.core import (IntextStyle, PaperDocument, ParseReport, ParseWarning,
-                           Reference, Section, SectionKind)
-from . import intext, pdf_extract, refparse, reflist, structure
+from ..models.core import (FloatBlock, IntextStyle, PaperDocument, ParseReport,
+                           ParseWarning, Reference, Section, SectionKind)
+from . import floats, intext, pdf_extract, refparse, reflist, structure
 
 # in-text style → default CSL style id (user can override in the UI)
 STYLE_TO_CSL = {
@@ -38,6 +40,18 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
     report.stages.append(
         f"A. Extracted {len(extracted.lines)} text lines from {extracted.n_pages} pages "
         f"(body font ≈ {extracted.body_size}pt, two-column detection per page)")
+
+    # ---- A′ (floats) ---------------------------------------------------
+    fl = floats.detect_floats(pdf_path, extracted)
+    report.warnings.extend(fl.warnings)
+    n_by_kind = {"figure": 0, "table": 0, "box": 0}
+    for f in fl.floats:
+        n_by_kind[f.kind.value] += 1
+    report.stages.append(
+        f"A′. Floats: {n_by_kind['figure']} figure(s), {n_by_kind['table']} table(s), "
+        f"{n_by_kind['box']} boxed panel(s) captured out of the prose flow "
+        f"({len(fl.claimed_ids)} text lines preserved on floats)")
+    extracted.lines = [ln for ln in extracted.lines if id(ln) not in fl.claimed_ids]
 
     # ---- B ------------------------------------------------------------
     structured = structure.build_structure(extracted)
@@ -106,6 +120,28 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
             page_start=rs.page_start, page_end=rs.page_end))
         if content:
             section_texts[sid] = content
+
+    # ---- A′ (attach floats to the sections whose prose surrounds them) --
+    line_to_sec: dict[int, str] = {}
+    for i, rs in enumerate(structured.sections, start=1):
+        for ln in rs.lines:
+            line_to_sec[id(ln)] = f"sec_{i}"
+    doc.floats = []
+    for fi, f in enumerate(fl.floats):
+        caption, body = floats.float_text(f)
+        anchor = fl.anchors.get(fi)
+        sec_id = line_to_sec.get(id(anchor)) if anchor is not None else None
+        if sec_id is None:
+            # anchor was a heading line (not part of any section body) or
+            # missing — fall back to the last section starting on/before
+            # the float's page
+            for i, rs in enumerate(structured.sections, start=1):
+                if rs.page_start is not None and rs.page_start <= f.page:
+                    sec_id = f"sec_{i}"
+        doc.floats.append(FloatBlock(
+            id=f"float_{fi + 1}", kind=f.kind, caption=caption, text=body,
+            page=f.page, section_id=sec_id))
+    report.n_floats = len(doc.floats)
 
     # ---- E ------------------------------------------------------------
     result = intext.tokenize_sections(section_texts, references)

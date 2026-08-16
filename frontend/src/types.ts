@@ -11,6 +11,7 @@ export interface ParseReport {
   n_references_unparsed: number;
   n_intext_citations: number;
   n_intext_unmatched: number;
+  n_floats: number;
   intext_style: string;
   intext_style_confidence: number;
 }
@@ -39,6 +40,14 @@ export interface Section {
   page_start?: number | null; page_end?: number | null;
 }
 
+/** A figure, table, or boxed panel captured out of the prose flow (stage A′).
+ *  Text is preserved; visual layout is not reconstructed. */
+export interface FloatBlock {
+  id: string; kind: "figure" | "table" | "box";
+  caption: string; text: string; page: number;
+  section_id?: string | null;
+}
+
 export interface InTextCitation {
   section_id: string; raw: string; ref_ids: string[]; context: string;
 }
@@ -46,7 +55,7 @@ export interface InTextCitation {
 export interface Paper {
   id: string; filename: string; uploaded_at: number;
   meta: { title: string; authors: string[]; abstract: string };
-  sections: Section[]; references: Reference[];
+  sections: Section[]; floats: FloatBlock[]; references: Reference[];
   intext_citations: InTextCitation[];
   parse_report: ParseReport;
   csl_style: string; csl_style_detected: boolean;

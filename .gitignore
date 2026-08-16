@@ -7,3 +7,4 @@ frontend/dist/
 .env
 nohup.out
 backend/scripts_prewarm*.py
+.DS_Store
