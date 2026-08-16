@@ -226,6 +226,79 @@ Check what the app actually has: `curl localhost:8000/api/health`.
    `paper.json` (the full canonical model), and `PROVENANCE.md` (every
    agent-added source plus edit history).
 
+## AI tools, and what I verified myself
+
+**Where AI was used.** Built with **Claude** in an agentic coding session,
+directed and reviewed by me. Claude drafted the application code — backend
+pipeline, agent, API, frontend — and the tests alongside it. The architecture
+(staged pipeline, citation tokens, typed agent ops, the integrity invariants)
+was worked out as an explicit design conversation before and during the
+coding, and is what [`docs/system-design.md`](docs/system-design.md)
+documents. I did not hand-write the code line by line: I set the
+requirements, made the design calls, drove the iteration, and verified the
+behaviour below.
+
+The app *also* uses an LLM at runtime — review query building, claim-support
+verdicts, relevance ranking, edit planning, constrained rewrites — and never
+trusts it. Quotes are checked verbatim against the real abstract before
+display, citation tokens are compared as multisets before and after an edit,
+and a new reference without a resolved source cannot enter the document.
+
+**What I verified, and how:**
+
+| | |
+|---|---|
+| **123 tests, no live network** | in-text detection across four style families, reference segmentation, entry parsing, the CSL round trip, the resolution ladder, the integrity checker, apply semantics, and agent flows against a scripted LLM |
+| **Real papers, repeatedly** | full pipeline runs on arXiv papers with *different* citation styles, inspecting every stage's output rather than just the final result |
+| **The browser, not just a clean compile** | every UI change clicked through. Several real bugs — a rail landing in the wrong grid column, a smooth scroll silently doing nothing across a long distance, a duplicate CSS rule quietly winning — typechecked perfectly and were visible only on screen |
+| **A clean clone** | venv → install → tests → uvicorn → build → upload a PDF, run from a fresh `git clone` rather than the working tree |
+| **The Docker image** | built, reports healthy, keys loaded from `.env` and verified *not* baked in, a real PDF parsed inside the container |
+| **The failure paths, deliberately** | no LLM key (must say so, not fake it), API 429s (must become visible findings), fabricated LLM quotes (must be discarded), edits that drop a citation (must be blocked) |
+
+**One honest caveat:** the development machine's shared egress IP exhausted
+the free-tier budgets of both academic APIs during part of the work, so some
+API-layer testing ran against recorded fixtures matching the real response
+schemas. Live 429 behaviour — backoff, then honest failure — was exercised
+for real, and nothing in the client is fixture-specific.
+
+Full note: [`docs/ai-use-and-verification.md`](docs/ai-use-and-verification.md).
+
+## Known limitations, and what I'd do next
+
+In full in [`docs/limitations.md`](docs/limitations.md). The ones worth
+knowing before you run it:
+
+- **Math is lossy.** Inline math extracts as glyph soup (`∥g1:T,i∥`) and is
+  preserved as text, not reconstructed. Exported `.tex` compiles as a
+  structural document; a maths-heavy paper needs cleanup.
+- **No OCR.** A scanned PDF is refused with a reason at stage A0 rather than
+  parsing into an empty document.
+- **Guarded styles stay unlinked when evidence is thin.** Superscript and
+  parenthesised-numeric citations need ≥3 linked markers, because `(3)` is
+  also how a paper references equation 3. Below that they stay plain text and
+  the count is reported.
+- **Pre-1900 years are invisible** — year detection is `19xx`/`20xx`
+  throughout, which stops volume numbers being read as years but loses a
+  cited 1890s work. Bites humanities papers, not contemporary STEM.
+- **citeproc-py gaps:** no `<sort>`, no `suppress-author`, no `2019a/b`
+  re-rendering. Worked around; a citeproc-js sidecar would fix all three.
+- **Claim checks judge abstracts, not full texts** — the prompt says so, and
+  returns `cannot_verify` when the abstract is insufficient.
+- **Free-tier limits are real.** OpenAlex has a per-IP daily budget; from a
+  shared or cloud IP it may already be spent. That surfaces as a failed
+  search, never as an empty result.
+- **Single process, on-disk JSON, no auth.** A local tool, not a deployment.
+- **No frontend tests.** The main testing gap.
+
+**With more time,** in the order I would do them: a **citeproc-js sidecar**
+for full CSL fidelity · **benchmark the parser against GROBID** on a corpus of
+arXiv PDFs with per-stage accuracy, and offer GROBID as an optional backend
+for stages C–D · **richer agent ops** (move/merge paragraphs with
+token-preserving splicing, replace a weak citation, deduplicate the
+bibliography) · **full-text claim checking** for open-access sources, keeping
+the same quote-verification rule · a **PDF-anchored view** overlaying parse
+results on the original pages so extraction can be audited visually.
+
 ## Where to look
 
 **[`docs/system-design.md`](docs/system-design.md)** is the primary document,
