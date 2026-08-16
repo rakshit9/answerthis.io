@@ -24,17 +24,16 @@ deliverable. Then [`limitations.md`](limitations.md) for the roadmap.
 
 ---
 
-## 2. ⚠️ Read this before anything else
+## 2. Status
 
-**Everything below is UNCOMMITTED.** The branch is at `987e0e0`, which does
-*not* contain any of this session's work.
+All of the work described below is **committed on `master`** (it was
+uncommitted when this note was first written on 2026-08-15; it landed on
+2026-08-16, along with the design-branch UI work, which was merged in).
+Nothing has been pushed to a remote.
 
-- Branch: `claude/paper-improvement-agent-123a6d`
-- Worktree: `.claude/worktrees/paper-improvement-agent-123a6d/`
-- ~475 insertions / ~488 deletions across 13 modified files, plus 4 new files
-
-**First action in a new session: commit this**, or it is one `git checkout`
-away from being lost. Nothing has been pushed.
+For how to run the app, read [`../README.md`](../README.md) — it is verified
+from a clean clone and is the authority. The rest of this file is background
+on how the code got the shape it has.
 
 ---
 
@@ -60,8 +59,10 @@ user):
   cumulative**, which is strict; the agent paces against it.
 - OpenAlex needs no key. `OPENALEX_MAILTO` is just an email for the polite pool.
 
-The backend reads plain `os.environ` — **there is no dotenv loading**, so
-writing a `.env` file silently does nothing. Pass vars to the uvicorn process.
+Put them in `backend/.env` (gitignored; `.env.example` lists the keys) —
+`config.py` loads that file at startup. An exported shell variable still
+overrides the file. *This changed on 2026-08-16; before that the backend read
+plain `os.environ` only and a `.env` file silently did nothing.*
 
 Verify with `curl localhost:8000/api/health` → should show
 `{"llm":"openai:gpt-4o-mini",…,"semantic_scholar_key":true}`. That only proves
