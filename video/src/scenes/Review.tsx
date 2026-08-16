@@ -95,7 +95,6 @@ export const ReviewRun: React.FC<{ durationInFrames: number }> = ({
             src="shots/06_review_findings.png"
             width={1040}
             delay={12}
-            zoom={1.05}
           />
         </div>
       </AbsoluteFill>
@@ -119,7 +118,6 @@ export const MissingWork: React.FC<{ durationInFrames: number }> = ({
             src="shots/07_claim_verdict.png"
             width={1080}
             delay={10}
-            zoom={1.04}
           />
         </div>
         <div style={{ flex: 1, marginTop: 10 }}>
@@ -188,7 +186,6 @@ export const ClaimChecks: React.FC<{ durationInFrames: number }> = ({
             src="shots/08_missing_work_cite.png"
             width={1120}
             delay={10}
-            zoom={1}
            />
         </div>
         <div style={{ flex: 1, marginTop: 30 }}>

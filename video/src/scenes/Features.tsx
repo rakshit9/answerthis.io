@@ -4,12 +4,12 @@
  * links, accepting a review finding, surfaced API failures, and the editable
  * LaTeX view.
  *
- * All of them lean on the shared Shot/Callout components so they sit in the
+ * All of them lean on the shared Shot and Card components so they sit in the
  * same visual language as the rest of the tour.
  */
 import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { Callout, Card, SceneHeader, SceneShell, Shot } from "../components";
+import { Card, SceneHeader, SceneShell, Shot } from "../components";
 import { theme } from "../theme";
 
 /** A row that slides in from the left, staggered by index. */
@@ -132,11 +132,7 @@ export const CitationClick: React.FC<{ durationInFrames: number }> = ({ duration
     <AbsoluteFill style={{ padding: "96px 120px" }}>
       <SceneHeader step="Reader" title="Every citation is a link" />
       <div style={{ marginTop: 44, display: "flex", justifyContent: "center" }}>
-        <Shot src="shots/05_citation_to_reference.png" width={1420} delay={10} zoom={1.05}
-          focus={{ x: 0.3, y: 0.55 }} label="localhost:8000">
-          <Callout x={4} y={44} w={44} h={10} text="click a citation" delay={30} place="top" />
-          <Callout x={4} y={56} w={44} h={9} text="its entry flashes" delay={60} place="bottom" />
-        </Shot>
+        <Shot src="shots/05_citation_to_reference.png" width={1230} delay={10} label="localhost:8000" />
       </div>
     </AbsoluteFill>
   </SceneShell>
@@ -152,10 +148,7 @@ export const CiteThis: React.FC<{ durationInFrames: number }> = ({ durationInFra
         subtitle="Cites that exact source, at that exact sentence — you still approve it."
       />
       <div style={{ marginTop: 44, display: "flex", justifyContent: "center" }}>
-        <Shot src="shots/08_missing_work_cite.png" width={1380} delay={10} zoom={1.06}
-          focus={{ x: 0.85, y: 0.6 }} label="localhost:8000">
-          <Callout x={72} y={62} w={26} h={9} text="Cite this" delay={40} place="left" />
-        </Shot>
+        <Shot src="shots/08_missing_work_cite.png" width={1100} delay={10} label="localhost:8000" />
       </div>
     </AbsoluteFill>
   </SceneShell>
@@ -210,10 +203,7 @@ export const LatexEdit: React.FC<{ durationInFrames: number }> = ({ durationInFr
         subtitle="Regenerated live from the canonical model — type in it, and the reader updates."
       />
       <div style={{ marginTop: 44, display: "flex", justifyContent: "center" }}>
-        <Shot src="shots/10_latex_editable.png" width={1420} delay={10} zoom={1.05}
-          focus={{ x: 0.45, y: 0.55 }} label="localhost:8000">
-          <Callout x={26} y={50} w={48} h={20} text="click the body and type" delay={34} place="top" />
-        </Shot>
+        <Shot src="shots/10_latex_editable.png" width={1100} delay={10} label="localhost:8000" />
       </div>
     </AbsoluteFill>
   </SceneShell>

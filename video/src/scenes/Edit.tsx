@@ -115,7 +115,6 @@ export const EditCommand: React.FC<{ durationInFrames: number }> = ({
               src="shots/09_edit_diff_integrity.png"
               width={980}
               delay={40}
-              zoom={1.06}
             />
           </div>
         </div>
@@ -139,7 +138,6 @@ export const EditDiff: React.FC<{ durationInFrames: number }> = ({
             src="shots/09_edit_diff_integrity.png"
             width={1160}
             delay={10}
-            zoom={1}
            />
         </div>
         <div style={{ flex: 1, marginTop: 26 }}>
@@ -246,7 +244,6 @@ export const Export: React.FC<{ durationInFrames: number }> = ({
             src="shots/11_export.png"
             width={1020}
             delay={14}
-            zoom={1.05}
           />
         </div>
       </AbsoluteFill>

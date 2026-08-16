@@ -71,7 +71,7 @@ export const Upload: React.FC<{ durationInFrames: number }> = ({
       }
       right={
         <div style={{ position: "relative" }}>
-          <Shot src="shots/01_upload.png" width={1080} delay={12} zoom={1.04} />
+          <Shot src="shots/01_upload.png" width={1080} delay={12} />
         </div>
       }
     />
@@ -204,7 +204,6 @@ export const ParseResult: React.FC<{ durationInFrames: number }> = ({
             src="shots/02_parse_live.png"
             width={1120}
             delay={10}
-            zoom={1}
            />
         </div>
         <div style={{ flex: 1, marginTop: 40 }}>
@@ -320,8 +319,6 @@ export const Resolve: React.FC<{ durationInFrames: number }> = ({
               src="shots/03_parse_overview.png"
               width={1020}
               delay={12}
-              zoom={1.08}
-              focus={{ x: 0.5, y: 0.8 }}
             />
           </div>
         }
@@ -365,7 +362,7 @@ export const Reader: React.FC<{ durationInFrames: number }> = ({
       }
       right={
         <div style={{ position: "relative" }}>
-          <Shot src="shots/04_reader_citations.png" width={1060} delay={12} zoom={1.07} />
+          <Shot src="shots/04_reader_citations.png" width={1060} delay={12} />
           <div
             style={{
               position: "absolute",

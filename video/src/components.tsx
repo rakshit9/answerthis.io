@@ -114,17 +114,19 @@ export const SceneHeader: React.FC<{
   );
 };
 
-/** A screenshot in a faux browser window, with an optional slow pan/zoom. */
+/** A screenshot in a faux browser window.
+ *
+ *  Deliberately no zoom or pan. Scaling the image inside a fixed frame
+ *  cropped the product at the edges — the left dock and the right panel
+ *  were the first things to go — and the whole point of these shots is that
+ *  the real UI is visible. The entrance is a fade and a small rise, which
+ *  cannot cut anything off. */
 export const Shot: React.FC<{
   src: string;
   width: number;
   delay?: number;
-  zoom?: number;
-  focus?: { x: number; y: number };
   label?: string;
-  /** Callouts, positioned in percentages of the image area. */
-  children?: React.ReactNode;
-}> = ({ src, width, delay = 0, zoom = 1.06, focus, label, children }) => {
+}> = ({ src, width, delay = 0, label }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const s = spring({
@@ -132,13 +134,8 @@ export const Shot: React.FC<{
     fps,
     config: { damping: 200, mass: 0.9 },
   });
-  const scale = interpolate(frame - delay, [0, 260], [1, zoom], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const height = (width / 1440) * 900;
-  const originX = focus ? `${focus.x * 100}%` : "50%";
-  const originY = focus ? `${focus.y * 100}%` : "40%";
+  // The screenshots are 1600×1000 (and 1440×900 before them) — both 1.6:1.
+  const height = width / 1.6;
   return (
     <div
       style={{
@@ -193,91 +190,12 @@ export const Shot: React.FC<{
           {label ?? "localhost:8000"}
         </div>
       </div>
-      <div style={{ height, overflow: "hidden", position: "relative" }}>
+      <div style={{ height, position: "relative" }}>
         <Img
           src={staticFile(src)}
-          style={{
-            width: "100%",
-            display: "block",
-            transform: `scale(${scale})`,
-            transformOrigin: `${originX} ${originY}`,
-          }}
+          style={{ width: "100%", height: "100%", display: "block", objectFit: "contain" }}
         />
       </div>
-      </div>
-      {/* Callout layer: same box as the image, but free to overflow. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 34,
-          width: "100%",
-          height,
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-};
-
-/** Highlight rectangle drawn over a Shot, in Shot-relative percentages. */
-export const Callout: React.FC<{
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  text: string;
-  delay?: number;
-  color?: string;
-  /** Where the label sits relative to the box. */
-  place?: "left" | "right" | "top" | "bottom";
-}> = ({ x, y, w, h, text, delay = 0, color = theme.accent, place = "right" }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const s = spring({ frame: frame - delay, fps, config: { damping: 200 } });
-
-  const labelPos: React.CSSProperties =
-    place === "right"
-      ? { top: "50%", left: "calc(100% + 16px)", transform: "translateY(-50%)" }
-      : place === "left"
-        ? { top: "50%", right: "calc(100% + 16px)", transform: "translateY(-50%)" }
-        : place === "top"
-          ? { bottom: "calc(100% + 12px)", left: 0 }
-          : { top: "calc(100% + 12px)", left: 0 };
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: `${x}%`,
-        top: `${y}%`,
-        width: `${w}%`,
-        height: `${h}%`,
-        border: `2px solid ${color}`,
-        borderRadius: 8,
-        background: `${color}14`,
-        opacity: s,
-        transform: `scale(${interpolate(s, [0, 1], [0.96, 1])})`,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          whiteSpace: "nowrap",
-          fontFamily: theme.mono,
-          fontSize: 22,
-          // Ink on a filled lime pill, the way the app labels anything —
-          // lime text on parchment is unreadable, and it has to stay legible
-          // sitting on top of a screenshot.
-          color: theme.accentInk,
-          background: color,
-          borderRadius: theme.radiusPill,
-          padding: "8px 16px",
-          ...labelPos,
-        }}
-      >
-        {text}
       </div>
     </div>
   );
