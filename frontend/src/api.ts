@@ -1,5 +1,5 @@
 import type {
-  EditProposal, Health, Paper, RenderedDoc, ReviewRun, StyleInfo,
+  EditProposal, Health, Paper, ParseJob, RenderedDoc, ReviewRun, StyleInfo,
 } from "./types";
 
 async function j<T>(r: Response): Promise<T> {
@@ -22,8 +22,10 @@ export const api = {
     const fd = new FormData();
     fd.append("file", file);
     return fetch("/api/papers", { method: "POST", body: fd })
-      .then((r) => j<{ id: string; title: string }>(r));
+      .then((r) => j<{ id: string; status: string }>(r));
   },
+  parseStatus: (id: string) =>
+    fetch(`/api/papers/${id}/parse`).then((r) => j<ParseJob>(r)),
   papers: () => fetch("/api/papers").then((r) => j<{ id: string; title: string; filename: string; n_references: number; version: number }[]>(r)),
   paper: (id: string) => fetch(`/api/papers/${id}`).then((r) => j<Paper>(r)),
   rendered: (id: string, style?: string) =>

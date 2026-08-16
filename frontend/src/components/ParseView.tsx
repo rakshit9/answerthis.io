@@ -55,9 +55,12 @@ export function ParseView({ paper, onResolve, resolving }: {
           </div>
           <ul className="outline">
             {paper.sections.map((s) => (
-              <li key={s.id} style={{ marginLeft: (s.level - 1) * 16 }}>
-                {s.title || "(untitled)"}
-                <span className="kind">{s.kind}{s.content ? ` · ${s.content.length} chars` : ""}</span>
+              <li key={s.id} style={{ marginLeft: (s.level - 1) * 14 }}>
+                <span className="outline-title">{s.title || "(untitled)"}</span>
+                <span className="kind">
+                  {s.kind !== "body" ? s.kind : s.content.length > 950
+                    ? `${(s.content.length / 1000).toFixed(1)}k` : `${s.content.length}`}
+                </span>
               </li>
             ))}
           </ul>

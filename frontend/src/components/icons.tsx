@@ -78,24 +78,50 @@ export const Icon = {
   ),
 };
 
-/** Upload-state illustration: a page with a lime spark settling onto it. */
+/** Upload illustration: a manuscript being scanned — a lime read-head sweeps
+ *  the page while citation chips lift off it. */
 export function DropIllustration({ active }: { active?: boolean }) {
   return (
-    <svg className={`drop-art ${active ? "on" : ""}`} width="132" height="104"
-      viewBox="0 0 132 104" fill="none" aria-hidden="true">
-      <rect className="da-sheet" x="34" y="14" width="64" height="80" rx="8"
-        fill="var(--color-pure-white)" stroke="var(--ink)" strokeWidth="1.6" />
-      <path className="da-line" d="M46 36h40M46 46h40M46 56h28" stroke="var(--color-ash)"
-        strokeWidth="2.6" strokeLinecap="round" />
-      <path className="da-line da-line-lime" d="M46 66h22" stroke="var(--accent)"
-        strokeWidth="2.6" strokeLinecap="round" />
-      <g className="da-spark">
-        <path d="M100 30l2.6 7.4L110 40l-7.4 2.6L100 50l-2.6-7.4L90 40l7.4-2.6z"
-          fill="var(--accent)" stroke="var(--ink)" strokeWidth="1.4" strokeLinejoin="round" />
+    <svg className={`drop-art ${active ? "on" : ""}`} width="200" height="132"
+      viewBox="0 0 200 132" fill="none" aria-hidden="true">
+      {/* back page, offset — a stack, not a single sheet */}
+      <rect x="72" y="10" width="66" height="96" rx="7" transform="rotate(4 105 58)"
+        fill="var(--bg-soft)" stroke="var(--color-ash)" strokeWidth="1.3" />
+      {/* front page */}
+      <g className="da-page">
+        <rect x="62" y="16" width="66" height="96" rx="7"
+          fill="var(--color-pure-white)" stroke="var(--ink)" strokeWidth="1.5" />
+        <path d="M72 34h46M72 43h46M72 52h30" stroke="var(--color-ash)" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M72 65h46M72 74h38" stroke="var(--color-ash)" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M72 88h46M72 97h24" stroke="var(--color-ash)" strokeWidth="2.4" strokeLinecap="round" />
+        {/* the read-head: lime bar sweeping the page */}
+        <g className="da-scan">
+          <rect x="66" y="0" width="58" height="7" rx="3.5"
+            fill="var(--accent)" opacity="0.9" />
+          <rect x="66" y="0" width="58" height="7" rx="3.5"
+            fill="none" stroke="var(--ink)" strokeWidth="1.1" />
+        </g>
       </g>
-      <circle className="da-dot da-dot-1" cx="22" cy="30" r="3" fill="var(--accent)" stroke="var(--ink)" strokeWidth="1.2" />
-      <circle className="da-dot da-dot-2" cx="112" cy="72" r="2.4" fill="var(--accent)" stroke="var(--ink)" strokeWidth="1.2" />
-      <circle className="da-dot da-dot-3" cx="18" cy="76" r="2" fill="none" stroke="var(--ink)" strokeWidth="1.2" />
+      {/* citation chips lifting off the page */}
+      <g className="da-chip da-chip-1">
+        <rect x="18" y="34" width="30" height="16" rx="8"
+          fill="var(--accent)" stroke="var(--ink)" strokeWidth="1.2" />
+        <text x="33" y="45.5" textAnchor="middle" fontSize="9" fontWeight="600"
+          fill="var(--ink)" fontFamily="var(--mono)">[12]</text>
+      </g>
+      <g className="da-chip da-chip-2">
+        <rect x="146" y="52" width="38" height="16" rx="8"
+          fill="var(--color-pure-white)" stroke="var(--ink)" strokeWidth="1.2" />
+        <text x="165" y="63.5" textAnchor="middle" fontSize="8.5" fontWeight="600"
+          fill="var(--ink)" fontFamily="var(--mono)">et al.</text>
+      </g>
+      <g className="da-chip da-chip-3">
+        <circle cx="152" cy="24" r="9" fill="var(--color-pure-white)" stroke="var(--ink)" strokeWidth="1.2" />
+        <path d="M148 24l3 3 5-6" stroke="var(--ink)" strokeWidth="1.4"
+          strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+      <circle className="da-dot da-dot-1" cx="40" cy="90" r="2.6" fill="var(--accent)" stroke="var(--ink)" strokeWidth="1" />
+      <circle className="da-dot da-dot-2" cx="160" cy="98" r="2.2" fill="none" stroke="var(--ink)" strokeWidth="1" />
     </svg>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../api";
 import { DropIllustration, Icon } from "./icons";
 
@@ -9,20 +9,19 @@ const STEPS: [string, () => JSX.Element][] = [
   ["Export", Icon.download],
 ];
 
-export function Upload({ onOpen }: { onOpen: (id: string) => void }) {
+export function Upload({ onParsing }: {
+  onParsing: (id: string, filename: string) => void;
+}) {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recent, setRecent] = useState<{ id: string; title: string; filename: string; n_references: number; version: number }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { api.papers().then(setRecent).catch(() => {}); }, []);
 
   const doUpload = async (file: File) => {
     setBusy(true); setError(null);
     try {
       const res = await api.upload(file);
-      onOpen(res.id);
+      onParsing(res.id, file.name);        // parsing runs in the background
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
       setBusy(false);
@@ -48,7 +47,7 @@ export function Upload({ onOpen }: { onOpen: (id: string) => void }) {
           {busy ? (
             <>
               <DropIllustration active />
-              <div className="big"><span className="spin" /> Parsing…</div>
+              <div className="big"><span className="spin" /> Uploading…</div>
             </>
           ) : (
             <>
@@ -77,22 +76,6 @@ export function Upload({ onOpen }: { onOpen: (id: string) => void }) {
           ))}
         </div>
       </div>
-
-      {recent.length > 0 && (
-        <div className="recent">
-          <h3>Recent</h3>
-          {recent.map((p) => (
-            <div className="card row-card" key={p.id} onClick={() => onOpen(p.id)}>
-              <span className="row-ico"><Icon.doc /></span>
-              <span className="row-main">
-                <strong>{p.title || p.filename}</strong>
-                <span className="small muted">{p.n_references} refs · v{p.version}</span>
-              </span>
-              <span className="row-go"><Icon.arrow size={15} /></span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
