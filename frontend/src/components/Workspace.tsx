@@ -75,10 +75,12 @@ function FindingCard({ f, onJump, onCite, citing, citeError, repeats = 1 }: {
       )}
       {f.claim_text && <blockquote>“{f.claim_text}”</blockquote>}
       {f.verdict && (
-        <div className="small">
-          <strong>{VERDICT_LABEL[f.verdict] ?? f.verdict}</strong>
-          {typeof f.confidence === "number" ? ` (confidence ${f.confidence})` : ""}
-          {f.verdict_rationale ? ` — ${f.verdict_rationale}` : ""}
+        <div className="small verdict">
+          <strong>
+            {VERDICT_LABEL[f.verdict] ?? f.verdict}
+            {typeof f.confidence === "number" ? ` · confidence ${f.confidence}` : ""}
+          </strong>
+          {f.verdict_rationale}
         </div>
       )}
       {!f.verdict && f.detail && <div className="small">{f.detail}</div>}

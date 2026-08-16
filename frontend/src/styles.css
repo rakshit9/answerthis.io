@@ -563,22 +563,44 @@ h3 > svg { color: var(--muted); }
 .finding .error-banner.small { margin-top: var(--sp-8); font-size: var(--text-caption); }
 
 /* ============================== review ============================== */
+/* Same idea inside the card: one gap, no per-element margins, so the
+   quote / verdict / evidence / source stack reads as evenly spaced rows. */
 .finding {
   border: 1px solid var(--line); border-left: 3px solid var(--line-strong);
   border-radius: 0 var(--r-inner) var(--r-inner) 0; background: var(--color-pure-white);
+  display: flex; flex-direction: column; gap: var(--sp-12);
 }
+.finding > * { margin: 0; }
 .finding.high { border-left-color: var(--bad); }
 .finding.medium { border-left-color: var(--warn); }
 .finding.low { border-left-color: var(--faint); }
 .finding.info { border-left-color: var(--accent); }
-.finding .ftitle { font-weight: 500; margin-bottom: var(--sp-8); font-size: var(--text-body); }
+/* Badge on its own line: at 420px a badge plus a paper title on one line
+   leaves the title two words per row. */
+.finding .ftitle {
+  font-weight: 500; font-size: var(--text-body); line-height: 1.4;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-8);
+}
+.finding .ftitle .badge { flex-shrink: 0; }
 .finding blockquote {
-  margin: var(--sp-8) 0; padding: var(--sp-12) var(--sp-16); background: var(--bg-soft);
+  padding: var(--sp-12) var(--sp-16); background: var(--bg-soft);
   border-radius: var(--r-inner); border-left: none;
   font-family: var(--serif); font-size: var(--text-body-sm); color: var(--muted);
+  line-height: 1.55;
 }
-.finding .prov { font-size: var(--text-caption); color: var(--faint); margin-top: var(--sp-8); }
-.source-line { margin-top: var(--sp-8); font-size: var(--text-body-sm); }
+/* The verdict is the finding's conclusion — it gets to be a block, not a
+   sentence wedged between two quotes. */
+.finding .verdict {
+  padding: var(--sp-12) var(--sp-16); border-radius: var(--r-inner);
+  background: var(--bg-soft); line-height: 1.55;
+}
+.finding .verdict strong { display: block; margin-bottom: 3px; }
+.finding .prov {
+  font-size: var(--text-caption); color: var(--faint); line-height: 1.5;
+  border-top: 1px solid var(--line); padding-top: var(--sp-12);
+}
+.finding .jump { margin: 0; }
+.source-line { font-size: var(--text-body-sm); line-height: 1.5; }
 .progress-log {
   font-family: var(--mono); font-size: var(--text-caption); background: var(--island);
   color: var(--bg-soft); border-radius: var(--r-inner);
@@ -610,10 +632,12 @@ input[type="checkbox"] { accent-color: var(--ink); }
   border-radius: var(--r-card); padding: var(--sp-16);
   display: flex; flex-direction: column; gap: var(--sp-12);
 }
-.checkrow { display: flex; align-items: center; gap: var(--sp-8); flex-wrap: wrap; }
+/* The label sits above rather than inline: inline, the two toggles could not
+   both fit beside it at panel width and broke onto ragged rows. */
+.checkrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .checkrow-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--faint); margin-right: var(--sp-4);
+  color: var(--faint); width: 100%; margin-bottom: 2px;
 }
 .toggle {
   display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
@@ -635,7 +659,12 @@ input[type="checkbox"] { accent-color: var(--ink); }
 .runlog > summary::after { content: "▾"; margin-left: auto; color: var(--faint); font-size: 10px; }
 .runlog[open] > summary::after { content: "▴"; }
 .runlog > summary:hover { color: var(--ink); }
-.runlog .progress-log { margin: 0 var(--sp-8) var(--sp-8); }
+.runlog > summary > span:not(.spin) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runlog .progress-log {
+  margin: 0 var(--sp-12) var(--sp-12); padding: var(--sp-12) var(--sp-16);
+}
+/* The filter row is a control strip, so it hugs the results it filters. */
+.fgroups + .finding { margin-top: calc(-1 * var(--sp-4)); }
 
 /* Findings, grouped. Counts are the point — they say where the work is. */
 .fgroups { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -970,11 +999,18 @@ section:hover .sec-edit-btn { opacity: 1; }
   text-transform: uppercase; letter-spacing: 0.1em;
 }
 .side-tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
-.side-body { flex: 1; overflow-y: auto; padding: var(--sp-20); }
-.side-body .runbar { margin-bottom: var(--sp-12); }
-.side-body .progress-log { margin: var(--sp-12) 0; max-height: 180px; }
-.side-body .finding { padding: var(--sp-16) var(--sp-20); }
-.checkrow { display: flex; gap: var(--sp-20); margin-bottom: var(--sp-12); }
+/* One rhythm for the whole panel: the column owns the spacing, its children
+   own none. Every block used to carry its own margin, which is why the
+   controls, the log and the findings all sat at different distances. */
+.side-body {
+  flex: 1; overflow-y: auto; padding: var(--sp-20);
+  display: flex; flex-direction: column; gap: var(--sp-16);
+}
+.side-body > * { margin-top: 0; margin-bottom: 0; }
+.side-body .card { margin-bottom: 0; }
+.side-body .runbar { margin-bottom: 0; }
+.side-body .progress-log { max-height: 200px; }
+.side-body .finding { padding: var(--sp-20); }
 .jump {
   display: inline-block; border: none; background: none; color: var(--ink);
   border-bottom: 1px solid var(--ink);
@@ -982,7 +1018,12 @@ section:hover .sec-edit-btn { opacity: 1; }
   text-align: left; cursor: pointer; font-weight: 500;
 }
 .jump:hover { border-bottom-color: transparent; }
-.prop-summary { margin-top: var(--sp-16); border-top: 1px solid var(--line); padding-top: var(--sp-16); }
+.prop-summary {
+  border-top: 1px solid var(--line); padding-top: var(--sp-16);
+  display: flex; flex-direction: column; gap: var(--sp-8);
+}
+.prop-summary > * { margin: 0; }
+.prop-summary .prop-stats { margin-top: var(--sp-4); }
 
 /* ============================== floats ============================== */
 .float {

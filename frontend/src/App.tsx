@@ -10,8 +10,14 @@ import { Icon } from "./components/icons";
 
 type Tab = "parse" | "paper" | "export";
 
+/** The open paper lives in the URL. Without this a refresh — or the dev
+ *  server reloading — drops you back on the upload screen with no route
+ *  back to a paper you already parsed, since papers are only reachable by
+ *  uploading them. It also makes a paper linkable. */
+const paperIdInUrl = () => new URLSearchParams(window.location.search).get("paper");
+
 export default function App() {
-  const [paperId, setPaperId] = useState<string | null>(null);
+  const [paperId, setPaperId] = useState<string | null>(paperIdInUrl);
   const [paper, setPaper] = useState<Paper | null>(null);
   const [tab, setTab] = useState<Tab>("parse");
   const [health, setHealth] = useState<Health | null>(null);
@@ -23,10 +29,27 @@ export default function App() {
   useEffect(() => { api.health().then(setHealth).catch(() => {}); }, []);
 
   const refresh = useCallback(() => {
-    if (paperId) api.paper(paperId).then(setPaper).catch(() => {});
+    // A stale ?paper= (deleted data dir, wrong backend) must not strand the
+    // app on a blank workspace — fall back to the upload screen.
+    if (paperId) api.paper(paperId).then(setPaper).catch(() => setPaperId(null));
   }, [paperId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Keep the address bar in step, and follow back/forward.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (paperId) url.searchParams.set("paper", paperId);
+    else url.searchParams.delete("paper");
+    if (url.toString() !== window.location.href)
+      window.history.pushState({}, "", url);
+  }, [paperId]);
+
+  useEffect(() => {
+    const onPop = () => setPaperId(paperIdInUrl());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const openPaper = useCallback((id: string) => {
     setParsing(null); setPaperId(id); setPaper(null); setTab("parse");
