@@ -34,6 +34,12 @@ export const api = {
       body: JSON.stringify({ style }),
     }).then((r) => j<{ ok: boolean }>(r)),
 
+  editSection: (id: string, sectionId: string, content: string, baseVersion: number) =>
+    fetch(`/api/papers/${id}/sections/${sectionId}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, base_version: baseVersion }),
+    }).then((r) => j<{ ok: boolean; version: number; changed: boolean }>(r)),
+
   startResolve: (id: string) =>
     fetch(`/api/papers/${id}/resolve`, { method: "POST" }).then((r) => j<{ started: boolean; todo: number }>(r)),
   resolveStatus: (id: string) =>
