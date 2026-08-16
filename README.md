@@ -40,7 +40,7 @@ Test with any real paper — arXiv PDFs work well (their references resolve on
 both APIs). e.g. `curl -L -o paper.pdf https://arxiv.org/pdf/1706.03762`.
 
 ```bash
-cd backend && python -m pytest tests/    # 67 tests for the core behaviors
+cd backend && python -m pytest tests/    # 76 tests for the core behaviors
 ```
 
 ## Configuration
@@ -65,9 +65,13 @@ that they need an LLM instead of faking output.
 1. **Upload & parse** — the first screen is the upload. The parse view shows
    the pipeline stage log, detected structure, in-text citation style (with
    confidence), and every reference with parsed fields + confidence;
-   unparseable entries are kept and flagged, not dropped. "Resolve" matches
-   references to OpenAlex/Semantic Scholar records (DOI → arXiv → title
-   ladder) with per-reference status and links.
+   unparseable entries are kept and flagged, not dropped. Figures, tables
+   and boxed panels are captured out of the prose flow (stage A′) and
+   listed with their captions, so their contents can't bleed into
+   paragraphs — text preserved, visual layout explicitly not
+   reconstructed. "Resolve" matches references to OpenAlex/Semantic
+   Scholar records (DOI → arXiv → title ladder) with per-reference status
+   and links.
 2. **Read** — the paper rendered with citeproc-formatted citation labels in
    the selected CSL style (APA, IEEE, Chicago, Harvard, Nature vendored;
    detected style is preselected).
@@ -90,7 +94,7 @@ that they need an LLM instead of faking output.
 
 ```
 backend/app/
-  parsing/    A–E pipeline: pdf_extract → structure → reflist → refparse → intext
+  parsing/    A–E pipeline: pdf_extract → floats → structure → reflist → refparse → intext
   models/     PaperDocument (token-bearing sections), Reference (CSL-JSON canonical),
               findings, proposals, integrity reports
   external/   OpenAlex + Semantic Scholar clients, disk cache, resolution ladder
@@ -100,6 +104,6 @@ backend/app/
   agent/      planner → typed ops → integrity checker → apply
   export/     LaTeX / BibTeX / Markdown / provenance
   api/        FastAPI routes; store.py = on-disk JSON persistence
-backend/tests/  67 pytest tests incl. a synthetic-PDF integration test
+backend/tests/  76 pytest tests incl. synthetic-PDF integration + float-capture tests
 frontend/       React + TS: upload → parse → read → review → edit (diff+approve) → export
 ```

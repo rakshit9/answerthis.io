@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { DropIllustration, Icon } from "./icons";
+
+const STEPS: [string, () => JSX.Element][] = [
+  ["Parse", Icon.pages],
+  ["Review", Icon.search],
+  ["Edit", Icon.pencil],
+  ["Export", Icon.download],
+];
 
 export function Upload({ onOpen }: { onOpen: (id: string) => void }) {
   const [drag, setDrag] = useState(false);
@@ -22,14 +30,11 @@ export function Upload({ onOpen }: { onOpen: (id: string) => void }) {
   };
 
   return (
-    <div>
+    <div className="fade-up">
       <div className="upload-hero">
-        <h1>Improve your paper before you submit it.</h1>
-        <p className="sub">
-          Upload a research paper PDF. Get a peer review grounded in real academic
-          search (Semantic Scholar &amp; OpenAlex), then edit by instruction —
-          with your citations kept intact.
-        </p>
+        <h1>Improve your paper<br />before you submit.</h1>
+        <p className="sub">Peer review grounded in real citations.</p>
+
         <div
           className={`dropzone ${drag ? "drag" : ""}`}
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -41,30 +46,49 @@ export function Upload({ onOpen }: { onOpen: (id: string) => void }) {
           }}
         >
           {busy ? (
-            <div className="big"><span className="spin" /> Parsing your PDF…</div>
+            <>
+              <DropIllustration active />
+              <div className="big"><span className="spin" /> Parsing…</div>
+            </>
           ) : (
             <>
-              <div className="big">Drop your paper PDF here</div>
-              <div className="hint">arXiv papers work well — their citations resolve on both search APIs</div>
-              <button onClick={() => fileRef.current?.click()}>Choose PDF</button>
+              <DropIllustration active={drag} />
+              <div className="big">Drop a paper PDF</div>
+              <div className="hint">arXiv works best</div>
+              <button onClick={() => fileRef.current?.click()}>
+                <Icon.upload /> Choose PDF
+              </button>
               <input ref={fileRef} type="file" accept="application/pdf" hidden
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void doUpload(f); }} />
             </>
           )}
         </div>
-        {error && <div className="error-banner" style={{ marginTop: 14 }}>{error}</div>}
+
+        {error && <div className="error-banner" style={{ marginTop: 14 }}>
+          <Icon.alert /> {error}
+        </div>}
+
         <div className="steps-note">
-          1 · Upload &amp; see the parse&nbsp;&nbsp;→&nbsp;&nbsp;2 · Request a peer
-          review&nbsp;&nbsp;→&nbsp;&nbsp;3 · Edit by instruction&nbsp;&nbsp;→&nbsp;&nbsp;4 · Export LaTeX
+          {STEPS.map(([label, Ico], i) => (
+            <span key={label} className="step">
+              <span className="step-ico"><Ico /></span>{label}
+              {i < STEPS.length - 1 && <i className="step-arrow"><Icon.arrow size={13} /></i>}
+            </span>
+          ))}
         </div>
       </div>
+
       {recent.length > 0 && (
         <div className="recent">
-          <h3>Recent papers</h3>
+          <h3>Recent</h3>
           {recent.map((p) => (
-            <div className="card" key={p.id} onClick={() => onOpen(p.id)}>
-              <strong>{p.title || p.filename}</strong>
-              <div className="small muted">{p.n_references} references · v{p.version}</div>
+            <div className="card row-card" key={p.id} onClick={() => onOpen(p.id)}>
+              <span className="row-ico"><Icon.doc /></span>
+              <span className="row-main">
+                <strong>{p.title || p.filename}</strong>
+                <span className="small muted">{p.n_references} refs · v{p.version}</span>
+              </span>
+              <span className="row-go"><Icon.arrow size={15} /></span>
             </div>
           ))}
         </div>

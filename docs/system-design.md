@@ -8,7 +8,8 @@ editing work under the hood).
 flowchart LR
     subgraph Parsing["Citation parsing (deterministic, no LLM)"]
         PDF[PDF] --> A[A. Layout extraction<br/>PyMuPDF lines+styles]
-        A --> B[B. Structure<br/>title / abstract / sections]
+        A --> AF[A′. Float capture<br/>figures / tables / boxes]
+        AF --> B[B. Structure<br/>title / abstract / sections]
         B --> C[C. Reference list<br/>segmentation]
         C --> D[D. Entry parsing<br/>fields + confidence]
         B --> E[E. In-text markers<br/>→ citation tokens]
@@ -67,6 +68,58 @@ Input: PDF file → Output: ordered, styled text lines.
 
 **Intermediate representation:** `Line{page, bbox, column, spans[{text, size,
 font, flags}]}` — layout and style survive to the stages that need them.
+
+### Stage A′ — Float capture (`floats.py`)
+
+Input: the PDF + stage-A lines → Output: figures / tables / boxed panels
+lifted **out** of the prose flow.
+
+A PDF has no "figure" or "table" object — only positioned text and vector
+graphics. Without this stage, the text inside a framed definition box or
+under a figure is extracted in reading order and bleeds into the
+surrounding section as garbled prose, and its bold sub-headings get
+mistaken for real section headings by stage B.
+
+1. **Candidate regions** per page, in claim-priority order:
+   - *ruled tables* via `page.find_tables()` (grid evidence is the
+     strongest signal, so it claims first, and cells are pre-extracted as
+     `a | b | c` rows);
+   - *drawn boxes* — stroked/filled rects from `page.get_drawings()` big
+     enough to hold text (≥ 90×24 pt) but not page-sized. A tcolorbox
+     renders as an outer border rect plus an inner fill rect, so
+     horizontally-aligned rects within 14 pt merge into one region;
+   - *image zones* — block type 1 (raster/vector figure bodies).
+2. **Claim lines** whose *center* falls inside a region (center, not
+   overlap, so a line grazing a border isn't stolen). A claimed line is
+   preserved on the float and removed from the prose stream — one line is
+   never in both places.
+3. **Captions** — lines matching `Figure N.` / `Fig. N.` / `Table N.`
+   attach to the nearest region above or below within 40 pt in the same
+   column band, and the caption *renames the float's kind* (a region
+   detected as a generic box captioned "Figure 1." is a figure). A
+   caption with no region nearby becomes a caption-only float **and a
+   warning** — never silently dropped.
+4. **Anchoring** — each float records the last prose line before it in
+   reading order, so the pipeline attaches it to the section whose text
+   surrounds it (falling back to the last section starting on/before its
+   page).
+
+**The honest contract:** nothing is dropped. Text either stays prose or
+moves onto a `FloatBlock`; both are visible in the UI, and the float's
+text ships in the LaTeX/Markdown export (as a `figure`/`table`
+environment, or a `quote` for an uncaptioned panel). A float whose anchor
+section isn't exported — e.g. it anchored into the References section —
+is emitted under "Unanchored floats" rather than lost. What is *not*
+reconstructed is visual layout: column structure, cell alignment, and
+vector artwork are gone, and the UI says so on every float instead of
+implying fidelity it doesn't have.
+
+*Measured on the assessment's own test paper* (a 24-page ICML position
+paper): captures the framed "Reasoning — informal definition / Core
+positions" panel with its "Figure 1." caption and the appendix checklist
+box — 66 text lines relocated out of prose, and body-section count drops
+25 → 17 because the checklist's bold list headers no longer masquerade as
+document sections.
 
 ### Stage B — Document structure (`structure.py`)
 
