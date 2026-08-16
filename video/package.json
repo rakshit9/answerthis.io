@@ -1,0 +1,23 @@
+{
+  "name": "pia-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion feature-tour video for Paper Improvement Agent",
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "npm run shots && remotion render FeatureTour out/paper-improvement-agent.mp4",
+    "still": "remotion still FeatureTour out/frame.png",
+    "voice": "node scripts/voice.mjs",
+    "shots": "rm -rf public/shots && mkdir -p public/shots && cp ../screenshots/*.png public/shots/"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.512",
+    "remotion": "4.0.512",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.6.3"
+  }
+}
