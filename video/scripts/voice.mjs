@@ -13,8 +13,38 @@ import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const VOICE = process.argv[2] ?? "Samantha";
-const RATE = 178;                       // words/min — measured, not guessed
+// Human narration sits around 150–160 wpm. The earlier 178 was the reason it
+// sounded like a screen reader rather than a voice-over.
+const RATE = 158;
 const OUT = path.resolve("public/vo");
+
+/** Words the synthesiser gets wrong, respelled for the ear only. The on-screen
+ *  script in narration.ts stays correct — this map is applied to the audio. */
+const SAY_AS = [
+  [/\bLaTeX\b/g, "Lay-Tech"],
+  [/\barXiv\b/g, "archive"],
+  [/\bCSL-JSON\b/g, "C S L JSON"],
+  [/\bCSL\b/g, "C S L"],
+  [/\bciteproc\b/g, "cite-prock"],
+  [/\bAPIs\b/g, "A P Eyes"],
+  [/\bAPI\b/g, "A P I"],
+  [/\bPDF\b/g, "P D F"],
+  [/\bDOI\b/g, "D O I"],
+  [/\bOpenAlex\b/g, "Open Alex"],
+  [/\bmain dot tex\b/g, "main dot tech"],
+];
+
+/** Real speech breathes at punctuation. `say` takes embedded pause commands,
+ *  and inserting them is most of the difference between "read aloud" and
+ *  "narrated". */
+const withPauses = (text) =>
+  text
+    .replace(/([.!?])\s+/g, "$1 [[slnc 380]] ")
+    .replace(/([,;:])\s+/g, "$1 [[slnc 140]] ")
+    .replace(/\s+—\s+/g, " [[slnc 220]] ");
+
+const forSpeech = (text) =>
+  withPauses(SAY_AS.reduce((s, [re, to]) => s.replace(re, to), text));
 mkdirSync(OUT, { recursive: true });
 
 // Read the script straight out of the TS module so the two cannot drift.
@@ -29,7 +59,7 @@ const durations = {};
 for (const [id, text] of Object.entries(NARRATION)) {
   const aiff = path.join(OUT, `${id}.aiff`);
   const wav = path.join(OUT, `${id}.wav`);
-  execFileSync("say", ["-v", VOICE, "-r", String(RATE), "-o", aiff, text]);
+  execFileSync("say", ["-v", VOICE, "-r", String(RATE), "-o", aiff, forSpeech(text)]);
   // Remotion wants a web-playable container; afconvert ships with macOS.
   execFileSync("afconvert", ["-f", "WAVE", "-d", "LEI16@44100", aiff, wav]);
   const info = execFileSync("afinfo", [wav]).toString();

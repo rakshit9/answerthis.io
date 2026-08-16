@@ -201,7 +201,7 @@ export const ParseResult: React.FC<{ durationInFrames: number }> = ({
       >
         <div style={{ width: 1120 }}>
           <Shot
-            src="shots/02_parse_live.png"
+            src="shots/03_parse_overview.png"
             width={1120}
             delay={10}
            />

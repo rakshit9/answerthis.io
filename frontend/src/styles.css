@@ -592,8 +592,10 @@ h3 > svg { color: var(--muted); }
 }
 /* Escape hatch: the bibliography is a long way from the prose. Anchored to
    the pane's corner rather than the sheet, so it never sits on the text. */
+/* Sits clear of the bottom edge — and of the apply bar, which appears there
+   whenever a proposal is open and would otherwise sit on top of it. */
 .bib-return {
-  position: absolute; right: var(--sp-24); bottom: var(--sp-24); z-index: 5;
+  position: absolute; right: var(--sp-24); bottom: 84px; z-index: 5;
   background: var(--ink); color: var(--bg-soft); border: none;
   padding: 9px 16px; border-radius: var(--r-pill);
   font-size: var(--text-body-sm); font-weight: 500;

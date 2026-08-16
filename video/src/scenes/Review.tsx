@@ -115,7 +115,7 @@ export const MissingWork: React.FC<{ durationInFrames: number }> = ({
       <div style={{ display: "flex", gap: 48, marginTop: 30 }}>
         <div style={{ width: 1080 }}>
           <Shot
-            src="shots/07_claim_verdict.png"
+            src="shots/08_missing_work_cite.png"
             width={1080}
             delay={10}
           />
@@ -183,7 +183,7 @@ export const ClaimChecks: React.FC<{ durationInFrames: number }> = ({
       <div style={{ display: "flex", gap: 48, marginTop: 30, alignItems: "flex-start" }}>
         <div style={{ width: 1120 }}>
           <Shot
-            src="shots/08_missing_work_cite.png"
+            src="shots/07_claim_verdict.png"
             width={1120}
             delay={10}
            />

@@ -19,7 +19,7 @@ export const NARRATION: Record<string, string> = {
   honesty:
     "What it cannot parse, it says so. Unlinked markers are surfaced rather than dropped, and a scanned PDF with no text layer is refused with a reason instead of parsing into an empty document.",
   styles:
-    "Numeric brackets, superscripts, parenthesised numbers, and author–year — including bracketed forms, and non-ASCII surnames like Müller and Álvarez that a naive parser silently misses.",
+    "Numeric brackets. Superscripts. Parenthesised numbers. Author and year, including the bracketed form. And surnames like Müller and Álvarez, which a naive parser silently misses.",
   resolve:
     "Every reference is matched against OpenAlex and Semantic Scholar, down a ladder of DOI, then arXiv, then title — with per-reference status you can inspect.",
   reader:
@@ -29,17 +29,17 @@ export const NARRATION: Record<string, string> = {
   reviewRun:
     "Peer review runs on request, never automatically, and you choose what it checks.",
   missingWork:
-    "Missing work: papers you plausibly should cite, found by real search across both APIs and deduped against your bibliography. Every one is a real, linkable source.",
+    "Missing work means papers you plausibly should cite. Found by real search across both APIs, and deduped against your own bibliography. Every one is a real, linkable source.",
   citeThis:
     "Accept one, and it proposes citing that exact source at that exact sentence — through the same approval path as any other edit.",
   claimChecks:
-    "Claim–citation checks fetch the cited work's abstract and judge whether it actually supports your sentence, with a verbatim quote that is verified against the real abstract before you ever see it.",
+    "Citation checks go further. They fetch the cited work's abstract, and judge whether it actually supports your sentence. The quote you see is verbatim, and it is checked against the real abstract before it is ever shown.",
   failures:
     "When a search fails, it says so. A dead API never looks like nothing found.",
   editCommand:
     "Edit by command. The agent plans typed operations instead of running one giant prompt, and logs every step it takes.",
   editDiff:
-    "Every change arrives as a proposal: an inline diff in the manuscript, new sources with their provenance, and a citation-integrity verdict. You approve each change yourself.",
+    "Every change arrives as a proposal. An inline diff in the manuscript. New sources, with their provenance. And a citation integrity verdict. You approve each change yourself.",
   tokens:
     "Citations live as tokens inside the text, so prose can move without losing what it cites. Edits that would break a citation are unapplyable by construction.",
   latex:
