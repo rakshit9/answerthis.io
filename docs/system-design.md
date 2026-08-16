@@ -6,32 +6,62 @@ editing work under the hood).
 
 ```mermaid
 flowchart LR
-    subgraph Parsing["Citation parsing (deterministic, no LLM)"]
-        PDF[PDF] --> A[A. Layout extraction<br/>PyMuPDF lines+styles]
-        A --> AF[A′. Float capture<br/>figures / tables / boxes]
-        AF --> B[B. Structure<br/>title / abstract / sections]
-        B --> C[C. Reference list<br/>segmentation]
-        C --> D[D. Entry parsing<br/>fields + confidence]
-        B --> E[E. In-text markers<br/>→ citation tokens]
+    PDF[/"PDF upload"/] --> GATE{{"A0 · readability gate"}}
+    GATE -->|"encrypted · no text layer"| REJECT["refused with a reason<br/>(never an empty parse)"]
+
+    subgraph Parsing["1 · Citation parsing — deterministic, no LLM"]
+        direction TB
+        GATE -->|readable| A["A · layout extraction"]
+        A --> AF["A′ · float capture"]
+        AF --> B["B · structure"]
+        B --> C["C · reference list"]
+        C --> D["D · entry parsing"]
+        B --> E["E · in-text markers"]
         D --> E
     end
-    subgraph Canon["Canonical model"]
-        DOC[(PaperDocument<br/>sections with tokens +<br/>references as CSL-JSON)]
+
+    E --> DOC[("PaperDocument<br/><b>the canonical model</b><br/>sections carry citation tokens<br/>references are CSL-JSON")]
+
+    subgraph Agent["2 · The agent — LLM-planned, API-grounded, human-approved"]
+        direction TB
+        REV["peer review<br/>missing work · claim checks"]
+        EDIT["NL editing<br/>plan → typed ops"]
+        PROP["EditProposal<br/>diffs + new refs + step log"]
+        INT{{"citation-integrity check<br/>I1 · I2 · I3"}}
+        OK["per-change human approval"]
+        REV -.->|"“Cite this”"| PROP
+        EDIT --> PROP --> INT
+        INT -->|violation| BLOCKED["unapplyable by construction"]
+        INT -->|clean| OK
     end
-    E --> DOC
-    subgraph Agent["Agent (LLM-planned, API-grounded, human-approved)"]
-        DOC --> REV[Peer review<br/>resolve · claim checks · missing work]
-        DOC --> EDIT[NL editing<br/>plan → ops → proposal]
-        EDIT --> INT{{Integrity checker}}
-        INT --> APPROVE[Human approval] --> APPLY[Apply + version]
-        APPLY --> DOC
+
+    DOC --> REV
+    DOC --> EDIT
+    OK --> APPLY["snapshot version → apply<br/>→ recompute in-text"] --> DOC
+
+    subgraph Ext["External boundary — one client, cached, rate-limited"]
+        S2[("Semantic Scholar")]
+        OA[("OpenAlex")]
     end
-    S2[(Semantic Scholar)] <--> REV
-    OA[(OpenAlex)] <--> REV
-    S2 <--> EDIT
-    OA <--> EDIT
-    DOC --> EXP[Export: LaTeX + BibTeX + Markdown<br/>via citeproc + CSL styles]
+    REV <--> Ext
+    EDIT <--> Ext
+
+    DOC --> RENDER["citeproc + vendored .csl"]
+    RENDER --> READER["reader view"]
+    RENDER --> EXPORT["LaTeX · BibTeX · Markdown · provenance"]
+
+    style DOC fill:#beff50,stroke:#14140f,color:#14140f
+    style REJECT stroke-dasharray: 4 3
+    style BLOCKED stroke-dasharray: 4 3
 ```
+
+Two invariants hold the whole design together, and every arrow above is
+arranged to protect them:
+
+| Invariant | Enforced by |
+|---|---|
+| No citation is invented — every one traces to a real record | the external boundary is the *only* source of new references; integrity rule I3 rejects any that arrives without provenance |
+| No edit silently breaks a citation | citations live as tokens inside the text; rules I1/I2 compare token multisets before and after, and a violating proposal cannot be applied |
 
 ---
 
@@ -41,9 +71,58 @@ flowchart LR
 or bibliography entry — is normalized into one canonical model (CSL-JSON),
 with confidence scores and explicit failure surfacing at every stage.
 
-The pipeline is five deterministic stages (`backend/app/parsing/`). No LLM is
+The pipeline is six deterministic stages (`backend/app/parsing/`). No LLM is
 involved in parsing: the same PDF always parses the same way, and every
 decision is explainable. The UI shows the stage log verbatim.
+
+**The pipeline, and what each stage hands the next.** The right-hand column is
+the intermediate representation — the thing that actually flows between
+stages. Dashed edges are failure paths; none of them drop data silently.
+
+```mermaid
+flowchart TB
+    PDF[/"PDF bytes"/] --> A0{{"A0 · readability gate"}}
+    A0 -. "encrypted<br/>&lt;200 chars of text" .-> ERR["PdfExtractionError<br/>→ HTTP 422, message written for the user"]
+    A0 -. "some image-only pages" .-> W0["ParseWarning: page numbers listed"]
+
+    A0 --> A["<b>A · layout extraction</b><br/>PyMuPDF spans → lines<br/>drop rotated · strip running heads<br/>detect columns · re-join split headings"]
+    A --> IRA["<code>Line{page, bbox, column,<br/>spans[{text,size,font,flags}]}</code>"]
+
+    IRA --> AF["<b>A′ · float capture</b><br/>ruled tables → drawn boxes → image zones<br/>claim lines by centre-point"]
+    AF --> IRAF["<code>FloatBlock{kind, caption, lines}</code><br/>+ prose lines, minus claimed ones"]
+
+    IRAF --> B["<b>B · structure</b><br/>numbering · size/weight vs body font<br/>known-heading list"]
+    B --> IRB["<code>Section{id, title, level, kind}</code><br/>title · abstract · section tree"]
+
+    IRB --> C["<b>C · reference-list segmentation</b><br/>3 strategies scored, best wins"]
+    C -. "no strategy scores ≥ 0.35" .-> W1["kept as one block<br/>+ reported as a segmentation failure"]
+    C --> IRC["<code>RawEntry{label, raw_text,<br/>italic_segments}</code>"]
+
+    IRC --> D["<b>D · entry parsing</b><br/>authors · year · title · venue · DOI"]
+    D -. "confidence &lt; 0.5" .-> W2["kept with raw text<br/>+ flagged unparsed in the UI"]
+    D --> IRD["<code>Reference{parsed, <b>csl</b>,<br/>parse_confidence, issues}</code>"]
+
+    IRB --> E["<b>E · in-text markers</b><br/>4 style families, guarded"]
+    IRD --> E
+    E -. "marker links to nothing" .-> W3["left verbatim in the text<br/>+ surfaced as unlinked"]
+    E --> IRE["section text with<br/><code>[[citep:ref_3]]</code> tokens"]
+
+    IRE --> DOC[("<b>PaperDocument</b><br/>the canonical model")]
+    IRD --> DOC
+    IRAF --> DOC
+    W0 --> REPORT[["ParseReport<br/>stage log + warnings<br/>rendered verbatim in the UI"]]
+    W1 --> REPORT
+    W2 --> REPORT
+    W3 --> REPORT
+    REPORT --> DOC
+
+    style DOC fill:#beff50,stroke:#14140f,color:#14140f
+    style ERR stroke-dasharray: 4 3
+```
+
+Every dashed edge above is a design position: the alternative to each one is
+dropping data and reporting success, which is the failure mode this project
+exists to avoid.
 
 ### Stage A — Layout extraction (`pdf_extract.py`)
 
@@ -240,6 +319,81 @@ A marker that *looks* like a citation but doesn't link (e.g. `[42]` with no
 reference 42) is left verbatim in the text and recorded as an unmatched
 marker — surfaced in the parse report, never silently deleted.
 
+**Style detection, and what happens when it is not sure.** Every family is
+counted, guarded, and scored; the winner is a *reported* decision with a
+confidence, not a silent one — and the user can override it.
+
+```mermaid
+flowchart TB
+    TXT["section text + parsed references"] --> PROBE["probe pass —<br/>count markers of each family<br/>that actually <b>link</b> to a reference"]
+
+    PROBE --> N1["numeric bracket<br/><code>[1, 4–7]</code>"]
+    PROBE --> N2["superscript<br/><code>word¹²</code>"]
+    PROBE --> N3["paren numeric<br/><code>(1, 3)</code>"]
+    PROBE --> N4["author–year<br/><code>(Smith, 2020)</code> · <code>Smith (2020)</code> · <code>[Smith 2020]</code>"]
+
+    N2 --> G1{{"≥3 linked<br/>AND no bracket style?"}}
+    N3 --> G2{{"≥3 linked<br/>AND no bracket style?"}}
+    G1 -. no .-> PLAIN["left as plain text<br/>+ counted in a parse note<br/><i>(footnote markers, equation refs)</i>"]
+    G2 -. no .-> PLAIN
+
+    N1 --> WIN{{"dominant family<br/>= detected style<br/>confidence = its share of linked markers"}}
+    N4 --> WIN
+    G1 -. yes .-> WIN
+    G2 -. yes .-> WIN
+
+    WIN --> TOK["tokenize <b>linked</b> markers<br/><code>[[citep:ref_1,ref_7]]</code> · <code>[[citet:ref_3]]</code>"]
+    WIN -. "no family links anything" .-> UNKNOWN["style = unknown<br/>document still usable<br/>markers stay as written"]
+
+    TOK --> MAP["default CSL style<br/>numeric → ieee · superscript → nature<br/>paren → ieee · author–year → apa"]
+    MAP --> USER["user override —<br/>any vendored .csl"]
+    USER --> CITEPROC["citeproc renders<br/>labels + bibliography"]
+
+    UNLINK["marker that looks like a citation<br/>but resolves to nothing"] -. "never deleted" .-> KEEP["left verbatim + surfaced as unlinked"]
+    PROBE --> UNLINK
+
+    style WIN fill:#beff50,stroke:#14140f,color:#14140f
+    style PLAIN stroke-dasharray: 4 3
+    style UNKNOWN stroke-dasharray: 4 3
+    style KEEP stroke-dasharray: 4 3
+```
+
+**Where CSL-JSON sits.** It is the *storage* format for a reference, and
+citeproc is the *only* thing that turns it into text. Nothing in the app
+formats a citation by hand.
+
+```mermaid
+flowchart LR
+    subgraph Sources["Every way a reference can enter"]
+        P["stage D — parsed from the PDF"]
+        R["resolution — OpenAlex / Semantic Scholar record"]
+        AG["agent search — a new work to cite"]
+        RF["“Cite this” — an accepted review finding"]
+    end
+
+    P --> CSL[("<b>Reference.csl</b><br/>CSL-JSON<br/><i>single canonical shape</i>")]
+    R --> CSL
+    AG --> CSL
+    RF --> CSL
+
+    SEC["Section.content<br/><code>…process [[citep:ref_3]].</code>"] --> REND
+
+    CSL --> REND["<b>citeproc-py</b> + vendored .csl"]
+    REND --> L["in-text labels"]
+    REND --> BIB["bibliography, ordered by the style"]
+    CSL --> BIBTEX["references.bib"]
+    L --> READER["reader"]
+    BIB --> READER
+    L --> TEX["main.tex — \\citep / \\cite"]
+    BIB --> TEX
+
+    style CSL fill:#beff50,stroke:#14140f,color:#14140f
+```
+
+A reference that cannot be rendered (too little structure, low confidence)
+still appears in the bibliography with its raw text and a visible flag —
+the honest fallback, rather than an entry that quietly disappears.
+
 **Why tokens are the central design decision:** the tokens in section text
 are the *source of truth* for where citations live. Everything else — the
 rendered labels, the bibliography, the LaTeX `\cite` commands, the integrity
@@ -273,6 +427,36 @@ the token invariant.
   An empty result is a result; a failed call is a failure — the two are never
   conflated.
 
+```mermaid
+flowchart LR
+    CALLER["review · resolution · agent search"] --> C["<b>cached_get(api, url, params)</b><br/>one door for every external call"]
+
+    C --> HIT{{"on disk?"}}
+    HIT -->|hit| RET["return — byte-identical<br/>to a live response"]
+    HIT -->|miss| RL["per-API rate limiter<br/>S2: 1 req/s cumulative"]
+    RL --> HTTP["HTTP GET"]
+
+    HTTP -->|200| STORE["cache to disk"] --> RET
+    HTTP -->|"429 · 5xx<br/><i>transient</i>"| BACK["bounded backoff,<br/>capped retries"] --> HTTP
+    HTTP -->|"429 <i>quota exhausted</i><br/>“insufficient budget”"| FAST["fail fast — retrying<br/>cannot help"]
+    HTTP -->|"4xx · timeout"| FAST
+
+    FAST --> ERR["<b>ApiError</b><br/><i>never cached</i>"]
+    ERR --> V1["review → SEARCH_FAILURE finding<br/><i>visible in the UI</i>"]
+    ERR --> V2["resolution → reference marked failed"]
+
+    style ERR stroke:#9c3b2e
+    style RET fill:#beff50,stroke:#14140f,color:#14140f
+```
+
+Two distinctions in that diagram carry real weight. **A cache hit and a live
+call return the same structure**, so tests run the identical code path with no
+network. And **an empty result is not a failure**: a search that legitimately
+found nothing says so, while a rate-limited or quota-exhausted call becomes a
+finding the reviewer can see. Conflating the two would let a dead API look
+like a clean bill of health — which is exactly the dishonesty this design
+refuses.
+
 ### Reference resolution ladder (`external/resolve.py`)
 
 `DOI → arXiv id → title search` (OpenAlex first, S2 as fallback), scored by
@@ -286,6 +470,49 @@ stays a parsed-but-unverified citation and is reported as such.
 
 Runs as a background job with a live, persisted progress log (the UI shows
 the raw log — including which queries ran and which failed).
+
+```mermaid
+flowchart TB
+    RUN[/"user starts a review<br/>(never automatic)"/] --> SCOPE["scope: missing work? claim checks?<br/>optional section_ids"]
+
+    SCOPE --> INTRO["<b>introspection</b> — no network<br/>unparsed refs · unresolved refs · style notes"]
+
+    SCOPE --> MW["<b>Missing work</b>"]
+    MW --> M1["M1 · build queries<br/><i>LLM: claims/topics per section</i><br/><i>no key: title + heading + keyphrases</i><br/>— provenance records which"]
+    M1 --> M2["M2 · run each query on <b>both</b> APIs"]
+    M2 -. "API error" .-> SF["SEARCH_FAILURE finding"]
+    M2 --> M3["M3 · drop what you already cite<br/>DOI · arXiv · fuzzy title"]
+    M3 --> M4["M4 · rank<br/><i>LLM relevance, else citations + overlap</i>"]
+    M4 --> FMW["MISSING_WORK finding<br/>+ real ExternalSource"]
+
+    SCOPE --> CC["<b>Claim ↔ citation checks</b>"]
+    CC --> K1["K1 · claim = the sentence<br/>around the token"]
+    K1 --> K2["K2 · evidence = the cited work's<br/>abstract, from resolution"]
+    K2 -. "no abstract / unresolved" .-> CV["cannot_verify<br/><i>with the reason</i>"]
+    K2 --> K3["K3 · one focused LLM judgment, temp 0<br/>verdict + rationale + verbatim quote"]
+    K3 --> QV{{"quote actually in<br/>the abstract? (fuzzy ≥85)"}}
+    QV -. no .-> DROP["quote discarded,<br/>finding says so"]
+    QV -->|yes| FCC["supports · partial ·<br/>does_not_support · cannot_verify"]
+
+    FMW --> OUT[["findings — each with its source,<br/>its section, and its provenance"]]
+    FCC --> OUT
+    CV --> OUT
+    SF --> OUT
+    INTRO --> OUT
+    DROP --> OUT
+
+    OUT --> UI["grouped in the UI:<br/>act on · checked · references · failures"]
+    UI -. "“Cite this”" .-> PROPOSAL["an EditProposal citing<br/><b>that exact source</b><br/>at <b>that exact sentence</b>"]
+
+    style OUT fill:#beff50,stroke:#14140f,color:#14140f
+    style DROP stroke-dasharray: 4 3
+    style SF stroke-dasharray: 4 3
+```
+
+The quote-verification step (`QV`) is the one that matters most: an LLM asked
+for a supporting quote will happily produce a plausible one that is not in the
+source. Checking it against the real abstract before display is the difference
+between grounded review and confident fiction.
 
 **Claim–citation checks** (`claims.py`): for a sampled set of citation sites
 (spread across sections and distinct references, capped for rate limits):
@@ -360,6 +587,48 @@ flowchart TD
      step log shows why.
    Every step (plan, searches with counts, drafts, checks, errors) is
    recorded in the proposal and rendered in the UI.
+**How citations survive an edit.** The token is the unit that must be
+conserved. Because it is plain text, it passes through an LLM unharmed;
+because it is trivially parseable, conservation is a multiset comparison
+rather than a heuristic.
+
+```mermaid
+flowchart TB
+    BEFORE["<b>before</b><br/><code>…reasoning [[citep:ref_3]] and<br/>scaling [[citep:ref_7]].</code><br/><i>multiset {ref_3, ref_7}</i>"]
+
+    BEFORE --> OP["operation<br/><i>rewrite_section</i> · <i>find_citations</i>"]
+    OP --> RULES["hard rules in the prompt:<br/>reproduce every token byte-for-byte,<br/>keep it on the statement it supports"]
+    RULES --> AFTER["<b>after</b> — candidate text"]
+
+    AFTER --> V{{"multiset compare"}}
+    V -. "token missing" .-> RETRY["one targeted retry naming<br/>the dropped tokens"]
+    RETRY --> AFTER
+    RETRY -. "still wrong" .-> FAIL["operation fails loudly —<br/>no partial edit is kept"]
+
+    V -->|"⊇ before"| I1["<b>I1</b> nothing lost"]
+    AFTER --> I2["<b>I2</b> every token resolves to a<br/>known or newly-proposed reference"]
+    NEW["new references from search"] --> I3["<b>I3</b> each carries api + URL provenance"]
+    AFTER --> I4["<b>I4</b> every declared insertion<br/>is a real token"]
+
+    I1 --> GATE{{"IntegrityReport"}}
+    I2 --> GATE
+    I3 --> GATE
+    I4 --> GATE
+
+    GATE -. violation .-> BLOCK["proposal cannot be applied<br/><i>the UI has no path to force it</i>"]
+    GATE -->|clean| HUMAN["per-change approval"]
+    HUMAN --> SUBSET["re-check the <b>approved subset</b><br/><i>approving A but rejecting B must not leave<br/>A citing a reference only B introduced</i>"]
+    SUBSET --> STALE{{"section changed<br/>since the proposal?"}}
+    STALE -. yes .-> REFUSE["refuse — stale base"]
+    STALE -->|no| SNAP["snapshot version → apply → recompute in-text"]
+    SNAP --> DONE[("PaperDocument v+1<br/>history + provenance retained")]
+
+    style DONE fill:#beff50,stroke:#14140f,color:#14140f
+    style BLOCK stroke:#9c3b2e
+    style FAIL stroke:#9c3b2e
+    style REFUSE stroke:#9c3b2e
+```
+
 3. **Integrity check** (`integrity.py`) — the non-negotiable:
    - *I1 no citation lost*: per changed section, after-multiset ⊇
      before-multiset; any shortfall must be covered by an explicit,

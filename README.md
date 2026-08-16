@@ -10,11 +10,18 @@ system without a real, linkable source.
 
 ## Watch it
 
-[![Feature tour](screenshots/00_video_poster.png)](screenshots/feature-tour.mp4)
+<video
+  src="https://github.com/rakshit9/answerthis.io/raw/master/screenshots/feature-tour.mp4"
+  poster="https://github.com/rakshit9/answerthis.io/raw/master/screenshots/00_video_poster.png"
+  controls
+  playsinline
+  width="100%">
+  <a href="https://github.com/rakshit9/answerthis.io/raw/master/screenshots/feature-tour.mp4">Feature tour (MP4, 3.8 min)</a>
+</video>
 
-**[▶ Feature tour — 3.8 min, with narration](screenshots/feature-tour.mp4)**
-*(GitHub won't play it inline from a repo path — click through, or download
-the file.)*
+**Feature tour — 3.8 min, with narration.** Press play above on github.com. If
+you're reading this in an editor or a renderer that strips `<video>`, open
+[`screenshots/feature-tour.mp4`](screenshots/feature-tour.mp4) directly.
 
 The whole workflow on a real 24-page paper: upload and the six parse stages,
 what the parser found and what it refused, citations as links, peer review
@@ -85,7 +92,7 @@ command above serves the built app at http://localhost:8000.
 **Tests:**
 
 ```bash
-cd backend && .venv/bin/python -m pytest tests/    # 116 tests, no network
+cd backend && .venv/bin/python -m pytest tests/    # 123 tests, no network
 docker compose run --rm app python -m pytest tests/    # or in the image
 ```
 
@@ -150,10 +157,16 @@ Check what the app actually has: `curl localhost:8000/api/health`.
 
 ## Where to look
 
-**[`docs/system-design.md`](docs/system-design.md)** is the primary document:
-the citation-parsing pipeline stage by stage, the intermediate
-representation, where CSL-JSON sits, and how a command becomes actions
-without breaking citations.
+**[`docs/system-design.md`](docs/system-design.md)** is the primary document,
+covering the two pieces the brief asks about, with eight diagrams:
+
+| | |
+|---|---|
+| **Citation parsing** | the pipeline stage by stage with the intermediate representation between each pair of stages, where CSL-JSON sits and everything that writes into it, how the four citation-style families are detected and guarded, and where each kind of failure surfaces |
+| **The agent** | how a command becomes typed operations, how the external API boundary caches / rate-limits / fails fast, how peer review runs missing-work search and claim–citation checks, and how the citation-integrity rules keep tokens conserved across an edit |
+
+The diagrams are Mermaid, so they render on GitHub and stay diffable in
+review — every one was checked against the code it describes.
 
 Also [`docs/limitations.md`](docs/limitations.md) (known gaps and what I'd do
 with more time) and
@@ -173,7 +186,7 @@ backend/app/
   agent/      planner → typed ops → integrity checker → apply
   export/     LaTeX / BibTeX / Markdown / provenance
   api/        FastAPI routes; store.py = on-disk JSON persistence
-backend/tests/  116 pytest tests incl. synthetic-PDF integration + float capture
+backend/tests/  123 pytest tests incl. synthetic-PDF integration + float capture
 frontend/       React + TS: upload → parse → read → review → edit (diff+approve) → export
 Dockerfile      two stages: node builds the frontend, python runs one uvicorn over both
 docker-compose.yml   one service; backend/data as a volume, backend/.env at run time
