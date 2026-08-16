@@ -14,9 +14,39 @@ shows this verbatim.
 """
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 from ..models.core import (FloatBlock, IntextStyle, PaperDocument, ParseReport,
                            ParseWarning, Reference, Section, SectionKind)
 from . import floats, intext, pdf_extract, refparse, reflist, structure
+
+# (stage_key, phase, text) — phase is "start" or "done". Stage keys match the
+# module docstring above, so a caller can narrate the algorithm as it runs.
+StageHook = Callable[[str, str, str], None]
+
+STAGE_LABELS: list[tuple[str, str]] = [
+    ("A", "Extract text & layout"),
+    ("A'", "Capture floats"),
+    ("B", "Build structure"),
+    ("C", "Segment reference list"),
+    ("D", "Parse reference fields"),
+    ("E", "Link in-text citations"),
+]
+
+
+class _Progress:
+    """Narrates stage boundaries to an optional hook; a no-op when absent."""
+
+    def __init__(self, hook: Optional[StageHook]):
+        self._hook = hook
+
+    def start(self, key: str) -> None:
+        if self._hook:
+            self._hook(key, "start", "")
+
+    def done(self, key: str, text: str) -> None:
+        if self._hook:
+            self._hook(key, "done", text)
 
 # in-text style → default CSL style id (user can override in the UI)
 STYLE_TO_CSL = {
@@ -29,19 +59,27 @@ STYLE_TO_CSL = {
 PARSE_OK_THRESHOLD = 0.5
 
 
-def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
+def parse_pdf(pdf_path: str, filename: str = "", *,
+              paper_id: str | None = None,
+              on_stage: Optional[StageHook] = None) -> PaperDocument:
     report = ParseReport()
     doc = PaperDocument(filename=filename or pdf_path.rsplit("/", 1)[-1])
+    if paper_id:
+        doc.id = paper_id
+    p = _Progress(on_stage)
 
     # ---- A ------------------------------------------------------------
+    p.start("A")
     extracted = pdf_extract.extract_document(pdf_path)
     report.n_pages = extracted.n_pages
     report.warnings.extend(extracted.warnings)
     report.stages.append(
         f"A. Extracted {len(extracted.lines)} text lines from {extracted.n_pages} pages "
         f"(body font ≈ {extracted.body_size}pt, two-column detection per page)")
+    p.done("A", report.stages[-1])
 
     # ---- A′ (floats) ---------------------------------------------------
+    p.start("A'")
     fl = floats.detect_floats(pdf_path, extracted)
     report.warnings.extend(fl.warnings)
     n_by_kind = {"figure": 0, "table": 0, "box": 0}
@@ -51,9 +89,11 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
         f"A′. Floats: {n_by_kind['figure']} figure(s), {n_by_kind['table']} table(s), "
         f"{n_by_kind['box']} boxed panel(s) captured out of the prose flow "
         f"({len(fl.claimed_ids)} text lines preserved on floats)")
+    p.done("A'", report.stages[-1])
     extracted.lines = [ln for ln in extracted.lines if id(ln) not in fl.claimed_ids]
 
     # ---- B ------------------------------------------------------------
+    p.start("B")
     structured = structure.build_structure(extracted)
     report.warnings.extend(structured.warnings)
     doc.meta = structured.meta
@@ -61,8 +101,10 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
         f"B. Structure: title {'found' if structured.meta.title else 'NOT found'}, "
         f"abstract {'found' if structured.meta.abstract else 'NOT found'}, "
         f"{len(structured.sections)} sections")
+    p.done("B", report.stages[-1])
 
     # ---- C ------------------------------------------------------------
+    p.start("C")
     ref_secs = [s for s in structured.sections if s.kind == SectionKind.REFERENCES]
     raw_entries: list[reflist.RawEntry] = []
     seg_note = "no references section found"
@@ -77,8 +119,10 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
         report.warnings.append(ParseWarning(
             stage="reflist", message="No references/bibliography section was detected"))
     report.stages.append(f"C. Reference list segmentation: {seg_note}")
+    p.done("C", report.stages[-1])
 
     # ---- D ------------------------------------------------------------
+    p.start("D")
     references: list[Reference] = []
     for i, entry in enumerate(raw_entries, start=1):
         fields, conf, issues = refparse.parse_entry(entry.raw_text, entry.italic_segments)
@@ -100,6 +144,7 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
     report.stages.append(
         f"D. Parsed {n_ok}/{len(references)} reference entries into structured fields "
         f"(threshold {PARSE_OK_THRESHOLD}); {len(references) - n_ok} surfaced as unparsed")
+    p.done("D", report.stages[-1])
     if len(references) - n_ok:
         report.warnings.append(ParseWarning(
             stage="refparse",
@@ -144,6 +189,7 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
     report.n_floats = len(doc.floats)
 
     # ---- E ------------------------------------------------------------
+    p.start("E")
     result = intext.tokenize_sections(section_texts, references)
     for sec in sections:
         if sec.id in result.sections_tokenized:
@@ -163,6 +209,7 @@ def parse_pdf(pdf_path: str, filename: str = "") -> PaperDocument:
         f"E. In-text citations: {len(result.citations)} marker groups linked "
         f"(style: {result.style.value}, confidence {result.style_confidence}); "
         f"{len(result.unmatched)} unlinked markers surfaced")
+    p.done("E", report.stages[-1])
 
     doc.csl_style = STYLE_TO_CSL[result.style]
     doc.csl_style_detected = result.style != IntextStyle.UNKNOWN and result.style_confidence >= 0.6

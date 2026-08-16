@@ -118,5 +118,17 @@ export interface RenderedDoc {
   bibliography: { ref_id: string; formatted: string; raw_fallback: boolean }[];
 }
 
+/** Live progress of the parse pipeline — one event per completed stage. */
+export interface ParseStageInfo { key: string; label: string }
+export interface ParseEvent { key: string; text: string; t: number }
+export interface ParseJob {
+  status: "running" | "done" | "failed";
+  current: string | null;
+  events: ParseEvent[];
+  stages: ParseStageInfo[];
+  filename?: string;
+  error?: string | null;
+}
+
 export interface Health { llm: string | null; llm_hint: string | null; semantic_scholar_key: boolean }
 export interface StyleInfo { id: string; title: string }

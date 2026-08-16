@@ -1,8 +1,48 @@
 import pytest
+from reportlab.lib.pagesizes import LETTER
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from app.models.core import (PaperDocument, ParsedFields, Reference, Section,
                              SectionKind)
 from app.parsing.pdf_extract import Line, Span
+
+BODY = ParagraphStyle("body", fontName="Times-Roman", fontSize=10, leading=13)
+H1 = ParagraphStyle("h1", fontName="Times-Bold", fontSize=13, leading=16,
+                    spaceBefore=10, spaceAfter=6)
+TITLE = ParagraphStyle("title", fontName="Times-Bold", fontSize=17, leading=20)
+REF = ParagraphStyle("ref", fontName="Times-Roman", fontSize=9, leading=12,
+                     leftIndent=18, firstLineIndent=-18)
+
+
+@pytest.fixture(scope="session")
+def synthetic_pdf(tmp_path_factory):
+    """A small real PDF built with reportlab — keeps PDF tests hermetic."""
+    path = tmp_path_factory.mktemp("pdf") / "synthetic.pdf"
+    doc = SimpleDocTemplate(str(path), pagesize=LETTER)
+    story = [
+        Paragraph("Synthetic Papers Considered Harmful", TITLE),
+        Spacer(1, 8),
+        Paragraph("Alice Author, Bob Builder", BODY),
+        Spacer(1, 12),
+        Paragraph("Abstract", H1),
+        Paragraph("We synthesize a small paper to test a parsing pipeline. "
+                  "The abstract mentions structured extraction and citations.", BODY),
+        Paragraph("1 Introduction", H1),
+        Paragraph("Parsing PDFs is hard [1]. Layout analysis helps [2]. "
+                  "Both problems interact [1, 2]. This paragraph exists to "
+                  "carry in-text citations for the integration test.", BODY),
+        Paragraph("2 Method", H1),
+        Paragraph("We apply heuristics with confidence scores throughout the "
+                  "processing pipeline and surface all failures to users.", BODY),
+        Paragraph("References", H1),
+        Paragraph("[1] J. Smith and A. Doe, “Parsing portable documents,” "
+                  "in Proc. DocEng, 2019, pp. 1-8.", REF),
+        Paragraph("[2] L. Chen, “Layout analysis at scale,” Journal of "
+                  "Document Engineering, vol. 12, pp. 33-41, 2021.", REF),
+    ]
+    doc.build(story)
+    return str(path)
 
 
 def make_line(text: str, page: int = 0, x0: float = 50, y0: float = 100,

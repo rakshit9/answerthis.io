@@ -2,18 +2,67 @@
 from __future__ import annotations
 
 import io
+import threading
+import time
+import uuid
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse, Response
 
 from .. import store
 from ..agent.apply import recompute_intext
+from ..config import settings
 from ..cslproc.render import DocumentRenderer, list_styles
 from ..export.latex import build_latex, build_zip
 from ..models.core import SectionKind, extract_token_ref_ids
-from ..parsing.pipeline import parse_pdf
+from ..parsing.pipeline import STAGE_LABELS, parse_pdf
 
 router = APIRouter(prefix="/api")
+
+# ---------------------------------------------------------------- parsing --
+# Parsing a real paper takes seconds, so it runs in a daemon thread and the
+# client polls — the same pattern resolve/review already use. Progress is the
+# pipeline's own documented stages, so the UI narrates the actual algorithm
+# rather than a decorative loading bar.
+_jobs: dict[str, dict] = {}
+_jobs_lock = threading.Lock()
+
+
+def _job_set(paper_id: str, **fields) -> None:
+    with _jobs_lock:
+        _jobs.setdefault(paper_id, {}).update(fields)
+
+
+def _run_parse(paper_id: str, tmp_path: str, filename: str) -> None:
+    started = time.time()
+    # Dwell per stage so the live view can narrate the algorithm. The real
+    # work happens first; the pad only tops a stage up to its minimum.
+    per_stage_min = settings.parse_min_seconds / max(1, len(STAGE_LABELS))
+    stage_started = {"t": started}
+
+    def on_stage(key: str, phase: str, text: str) -> None:
+        if phase == "start":
+            stage_started["t"] = time.time()
+            with _jobs_lock:
+                _jobs.setdefault(paper_id, {})["current"] = key
+            return
+        pad = per_stage_min - (time.time() - stage_started["t"])
+        if pad > 0:
+            time.sleep(pad)
+        with _jobs_lock:
+            job = _jobs.setdefault(paper_id, {})
+            job["current"] = None
+            job.setdefault("events", []).append(
+                {"key": key, "text": text, "t": round(time.time() - started, 2)})
+
+    try:
+        doc = parse_pdf(tmp_path, filename=filename, paper_id=paper_id, on_stage=on_stage)
+        store.save_paper(doc)
+        _job_set(paper_id, status="done", current=None,
+                 report=doc.parse_report.model_dump())
+    except Exception as e:                                        # noqa: BLE001
+        _job_set(paper_id, status="failed", current=None,
+                 error=f"Could not parse this PDF: {e}")
 
 
 @router.get("/styles")
@@ -23,6 +72,7 @@ def get_styles():
 
 @router.post("/papers")
 async def upload_paper(file: UploadFile):
+    """Accept the PDF and start parsing; the client polls /parse for stages."""
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "Please upload a PDF file.")
     content = await file.read()
@@ -32,14 +82,30 @@ async def upload_paper(file: UploadFile):
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
-    try:
-        doc = parse_pdf(tmp_path, filename=file.filename or "paper.pdf")
-    except Exception as e:                                    # noqa: BLE001
-        raise HTTPException(422, f"Could not parse this PDF: {e}") from e
-    store.save_pdf(doc.id, content)
-    store.save_paper(doc)
-    return {"id": doc.id, "title": doc.meta.title,
-            "report": doc.parse_report.model_dump()}
+
+    paper_id = uuid.uuid4().hex[:12]
+    store.save_pdf(paper_id, content)
+    _job_set(paper_id, status="running", current=None, events=[],
+             filename=file.filename or "paper.pdf")
+    threading.Thread(target=_run_parse, daemon=True,
+                     args=(paper_id, tmp_path, file.filename or "paper.pdf")).start()
+    return {"id": paper_id, "status": "running",
+            "stages": [{"key": k, "label": lbl} for k, lbl in STAGE_LABELS]}
+
+
+@router.get("/papers/{paper_id}/parse")
+def parse_status(paper_id: str):
+    with _jobs_lock:
+        job = dict(_jobs.get(paper_id) or {})
+    if not job:
+        # Restart or an already-parsed paper: report done if it's on disk.
+        if store.load_paper(paper_id) is not None:
+            return {"status": "done", "current": None, "events": [],
+                    "stages": [{"key": k, "label": lbl} for k, lbl in STAGE_LABELS]}
+        raise HTTPException(404, "No such parse job")
+    job["stages"] = [{"key": k, "label": lbl} for k, lbl in STAGE_LABELS]
+    job.setdefault("events", [])
+    return job
 
 
 @router.get("/papers")

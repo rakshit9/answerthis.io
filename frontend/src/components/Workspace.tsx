@@ -78,6 +78,12 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
   const [savingSec, setSavingSec] = useState(false);
   const [secError, setSecError] = useState<string | null>(null);
 
+  // ---- select-to-act toolbar (agentic editing scoped to a passage) ----
+  const [sel, setSel] = useState<{
+    sectionId: string; sectionTitle: string; text: string; x: number; y: number;
+  } | null>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
+
   // ---- edit state ----
   const [command, setCommand] = useState("");
   const [busy, setBusy] = useState(false);
@@ -173,6 +179,40 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
     }, 60);
   }, []);
 
+  /** Selection → floating action pill. Position is relative to the pane. */
+  const onReaderMouseUp = () => {
+    const s = window.getSelection();
+    const text = s?.toString().trim() ?? "";
+    if (!s || s.isCollapsed || text.length < 8 || text.length > 600) { setSel(null); return; }
+    const node = s.anchorNode instanceof Element ? s.anchorNode : s.anchorNode?.parentElement;
+    const secEl = node?.closest?.("section[id^='psec-']");
+    if (!secEl) { setSel(null); return; }
+    const sectionId = secEl.id.replace("psec-", "");
+    const title = paper.sections.find((x) => x.id === sectionId)?.title || "this section";
+    const rect = s.getRangeAt(0).getBoundingClientRect();
+    const pane = paneRef.current?.getBoundingClientRect();
+    if (!pane) return;
+    setSel({
+      sectionId, sectionTitle: title, text,
+      x: Math.min(Math.max(rect.left + rect.width / 2 - pane.left, 150), pane.width - 150),
+      y: Math.max(rect.top - pane.top, 46),
+    });
+  };
+
+  const runEditWith = (cmd: string) => {
+    setSel(null);
+    window.getSelection()?.removeAllRanges();
+    setPanel("edit");
+    setCommand(cmd);
+    setBusy(true); setApplyError(null);
+    api.startEdit(paper.id, cmd)
+      .then(({ proposal_id }) => pollEdit(proposal_id))
+      .catch((e) => setApplyError(String(e instanceof Error ? e.message : e)))
+      .finally(() => setBusy(false));
+  };
+
+  const quoteSel = (t: string) => `“${t.length > 160 ? t.slice(0, 160) + "…" : t}”`;
+
   const beginSecEdit = (sectionId: string) => {
     const raw = paper.sections.find((s) => s.id === sectionId)?.content ?? "";
     setEditingSec(sectionId);
@@ -239,7 +279,7 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
   return (
     <div className="wsplit">
       {/* ------------------------------------------------ paper (left) -- */}
-      <div className="paper-pane">
+      <div className="paper-pane" ref={paneRef}>
         <div className="paper-pane-head">
           <div className="seg">
             <button className={view === "reader" ? "on" : ""} onClick={() => setView("reader")}>Paper</button>
@@ -252,8 +292,34 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
           </span>
         </div>
 
-        {view === "latex" ? <LatexPane paper={paper} /> : (
-          <div className="sheet-scroll">
+        {sel && (
+          <div className="sel-bar" style={{ left: sel.x, top: sel.y }}
+            onMouseDown={(e) => e.preventDefault()}>
+            <button onClick={() => runEditWith(
+              `add citations supporting this passage in "${sel.sectionTitle}": ${quoteSel(sel.text)}`)}>
+              <Icon.link size={13} /> Cite
+            </button>
+            <button onClick={() => runEditWith(
+              `shorten this passage in "${sel.sectionTitle}" without losing citations: ${quoteSel(sel.text)}`)}>
+              <Icon.spark size={13} /> Shorten
+            </button>
+            <button onClick={() => runEditWith(
+              `improve the clarity of this passage in "${sel.sectionTitle}": ${quoteSel(sel.text)}`)}>
+              <Icon.pencil size={13} /> Improve
+            </button>
+            <button onClick={() => {
+              setPanel("edit");
+              setCommand(`in "${sel.sectionTitle}", ${quoteSel(sel.text)}: `);
+              setSel(null);
+            }}>
+              Ask…
+            </button>
+          </div>
+        )}
+
+        {view === "latex" ? <LatexPane paper={paper} onChanged={onPaperRefresh} /> : (
+          <div className="sheet-scroll" onMouseUp={onReaderMouseUp}
+            onScroll={() => setSel(null)}>
             {!doc ? (
               <div className="muted" style={{ padding: 24 }}><span className="spin" /> Rendering with citeproc…</div>
             ) : (
@@ -538,16 +604,6 @@ export function Workspace({ paper, llm, onPaperRefresh }: {
               </div>
             )}
 
-            {paper.history.length > 0 && (
-              <div className="card" style={{ marginTop: 10 }}>
-                <h3 style={{ margin: "0 0 6px" }}><Icon.pencil /> History</h3>
-                <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
-                  {paper.history.map((h) => (
-                    <li key={h.version}>v{h.version} → v{h.version + 1}: {h.reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         )}
       </aside>
