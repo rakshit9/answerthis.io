@@ -22,6 +22,7 @@ from . import floats, intext, pdf_extract, refparse, reflist, structure
 STYLE_TO_CSL = {
     IntextStyle.NUMERIC_BRACKET: "ieee",
     IntextStyle.NUMERIC_SUPERSCRIPT: "nature",
+    IntextStyle.NUMERIC_PAREN: "ieee",
     IntextStyle.AUTHOR_YEAR: "apa",
     IntextStyle.UNKNOWN: "ieee",
 }

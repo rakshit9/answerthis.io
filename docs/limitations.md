@@ -4,8 +4,13 @@
 
 - **Math and exotic layouts.** Inline math extracted from PDFs is lossy
   (glyph soup like `∥g1:T,i∥`); the pipeline preserves it as text but doesn't
-  reconstruct LaTeX math. Scanned/OCR-needing PDFs are out of scope. Tables
-  and figures are not modeled (their text can bleed into sections).
+  reconstruct LaTeX math. Tables and figures are not modeled (their text can
+  bleed into sections).
+- **Scanned PDFs are out of scope, but not silently.** No OCR is performed.
+  A PDF with no text layer is detected at stage A0 and rejected with a
+  message naming the page count and suggesting `ocrmypdf`, rather than
+  parsing into an empty document. A partially scanned PDF is parsed, with
+  the image-only page numbers surfaced as a parse warning.
 - **Heading detection** relies on numbering/size/bold heuristics plus a
   known-name list; unnumbered, body-sized headings in unusual templates can
   be missed (the text then merges into the previous section — visible in the
@@ -13,6 +18,14 @@
 - **Superscript citation styles** are only trusted with ≥3 distinct linked
   markers to avoid mislinking footnotes; a paper with 2 superscript citations
   won't get them linked (they're surfaced as dropped sentinels).
+- **Parenthesised numeric styles** (`(1)`, `(1, 3)`) carry the same ambiguity
+  against equation references, and are held to the same ≥3-marker guard plus
+  the absence of a bracket style. A PNAS-style paper citing only twice keeps
+  those markers as plain text, with the count reported as a parse note.
+- **Citation years before 1900 are not recognised** anywhere in the pipeline —
+  year detection is `19xx`/`20xx` throughout, which keeps volume and page
+  numbers from being read as years but makes a cited 1890s work invisible.
+  This bites historical and humanities papers, not contemporary STEM ones.
 - **Author parsing** covers the common families (given-first, family-first
   pairs, initials-first, Vancouver, `et al.`, particles) but will mis-split
   rare formats; confidence + issues surface these per reference, and the raw

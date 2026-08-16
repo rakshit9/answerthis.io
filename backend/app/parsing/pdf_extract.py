@@ -6,6 +6,11 @@ Output: ``ExtractedDoc`` — per-page lists of ``Line`` objects in reading
         the estimated body font size and any warnings.
 
 Steps (documented, deterministic — no ML, no LLM):
+  A0. Readability gate: reject an encrypted PDF, and reject a PDF with no
+      extractable text layer (a scan / image-only export) with a specific
+      message instead of letting it parse to an empty document. Pages that
+      are individually image-only in an otherwise text-bearing PDF are kept
+      and reported as a warning.
   A1. Rasterless text extraction via PyMuPDF ``page.get_text("dict")``:
       blocks → lines → spans with bbox, font name, size, style flags.
   A2. Drop rotated text (arXiv margin watermark) and out-of-flow artifacts.
@@ -40,6 +45,38 @@ LIGATURES = {
     "ﬃ": "ffi", "ﬄ": "ffl", "’": "'", "‘": "'",
     "“": '"', "”": '"', " ": " ",
 }
+
+
+# A0: below this many extractable characters across the whole document there is
+# nothing for stages B–E to work with. A single real page carries thousands; the
+# slack absorbs repository cover stamps glued onto an otherwise-scanned PDF.
+MIN_DOC_CHARS = 200
+
+
+class PdfExtractionError(RuntimeError):
+    """Stage-A failure caused by the *document*, not by a bug in the parser.
+
+    Carries a message written for the person who uploaded the file — the API
+    surfaces it verbatim instead of wrapping it in a generic parse error.
+    """
+
+
+class EncryptedPdfError(PdfExtractionError):
+    """The PDF is password-protected, so no content can be read at all."""
+
+
+class NoTextLayerError(PdfExtractionError):
+    """The PDF carries no text layer — a scan or an image-only export.
+
+    The counts are kept as attributes so callers can report specifics without
+    having to parse the message string.
+    """
+
+    def __init__(self, message: str, *, n_pages: int, n_image_only: int, n_chars: int):
+        super().__init__(message)
+        self.n_pages = n_pages
+        self.n_image_only = n_image_only
+        self.n_chars = n_chars
 
 
 def clean_text(s: str) -> str:
@@ -115,9 +152,22 @@ def _norm_for_repeat(s: str) -> str:
 
 def extract_document(pdf_path: str) -> ExtractedDoc:
     doc = pymupdf.open(pdf_path)
+
+    # ---- A0a: an encrypted PDF yields nothing; say so precisely --------
+    if doc.needs_pass:
+        doc.close()
+        raise EncryptedPdfError(
+            "This PDF is password-protected, so its text cannot be read. "
+            "Remove the password and upload it again.")
+
     warnings: list[ParseWarning] = []
     all_pages_raw: list[list[Line]] = []
     page_height = 792.0
+
+    # A0b bookkeeping: how much text each page yielded, and whether the page
+    # carries images. A page with images and no text is a scanned page.
+    page_chars: list[int] = []
+    page_has_image: list[bool] = []
 
     n_rotated_dropped = 0
     for pno in range(doc.page_count):
@@ -125,8 +175,11 @@ def extract_document(pdf_path: str) -> ExtractedDoc:
         page_height = page.rect.height
         pdict = page.get_text("dict")
         page_lines: list[Line] = []
+        n_chars = 0
+        has_image = False
         for block in pdict.get("blocks", []):
             if block.get("type") != 0:       # images
+                has_image = True
                 continue
             for line in block.get("lines", []):
                 dx, dy = line.get("dir", (1, 0))
@@ -138,11 +191,42 @@ def extract_document(pdf_path: str) -> ExtractedDoc:
                          s.get("font", ""), s.get("flags", 0))
                     for s in line.get("spans", [])
                 ]
-                if not "".join(sp.text for sp in spans).strip():
+                joined = "".join(sp.text for sp in spans).strip()
+                if not joined:
                     continue
+                n_chars += len(joined)
                 bx0, by0, bx1, by1 = line["bbox"]
                 page_lines.append(Line(pno, bx0, by0, bx1, by1, 0, spans))
         all_pages_raw.append(page_lines)
+        page_chars.append(n_chars)
+        page_has_image.append(has_image)
+
+    # ---- A0c: no text layer anywhere → refuse, with a specific reason --
+    total_chars = sum(page_chars)
+    image_only = [i for i, (c, img) in enumerate(zip(page_chars, page_has_image))
+                  if c == 0 and img]
+    if total_chars < MIN_DOC_CHARS:
+        n_pages_total = doc.page_count
+        doc.close()
+        scanned = (f" {len(image_only)} page(s) contain only images."
+                   if image_only else "")
+        raise NoTextLayerError(
+            f"This PDF has no extractable text layer — only {total_chars} character(s) "
+            f"across {n_pages_total} page(s).{scanned} It is almost certainly a scan or "
+            f"an image-only export. This app does not run OCR; OCR the file first "
+            f"(for example `ocrmypdf in.pdf out.pdf`) and upload the result.",
+            n_pages=n_pages_total, n_image_only=len(image_only), n_chars=total_chars)
+
+    # ---- A0d: partially scanned → parse the rest, report the gap -------
+    if image_only:
+        shown = ", ".join(str(p + 1) for p in image_only[:10])
+        more = f" (+{len(image_only) - 10} more)" if len(image_only) > 10 else ""
+        warnings.append(ParseWarning(
+            stage="extract",
+            message=f"{len(image_only)} page(s) have no text layer and were not parsed",
+            detail=f"Page(s) {shown}{more} contain only images — likely scanned. "
+                   f"Their content is not present in the PDF as text, so nothing on "
+                   f"them was extracted. OCR the file if you need it."))
 
     if n_rotated_dropped:
         warnings.append(ParseWarning(

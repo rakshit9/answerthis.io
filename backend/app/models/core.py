@@ -135,7 +135,8 @@ class InTextCitation(BaseModel):
 class IntextStyle(str, Enum):
     NUMERIC_BRACKET = "numeric_bracket"     # [1], [1,3-5]
     NUMERIC_SUPERSCRIPT = "superscript"     # word^1
-    AUTHOR_YEAR = "author_year"             # (Smith et al., 2020) / Smith (2020)
+    NUMERIC_PAREN = "numeric_paren"         # (1), (1, 3)
+    AUTHOR_YEAR = "author_year"             # (Smith et al., 2020) / [Smith 2020]
     UNKNOWN = "unknown"
 
 

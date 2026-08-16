@@ -11,6 +11,7 @@ from ..agent.apply import recompute_intext
 from ..cslproc.render import DocumentRenderer, list_styles
 from ..export.latex import build_latex, build_zip
 from ..models.core import SectionKind, extract_token_ref_ids
+from ..parsing.pdf_extract import PdfExtractionError
 from ..parsing.pipeline import parse_pdf
 
 router = APIRouter(prefix="/api")
@@ -34,6 +35,10 @@ async def upload_paper(file: UploadFile):
         tmp_path = tmp.name
     try:
         doc = parse_pdf(tmp_path, filename=file.filename or "paper.pdf")
+    except PdfExtractionError as e:
+        # The document itself is unreadable (encrypted / no text layer). The
+        # message is already written for the user — pass it through as-is.
+        raise HTTPException(422, str(e)) from e
     except Exception as e:                                    # noqa: BLE001
         raise HTTPException(422, f"Could not parse this PDF: {e}") from e
     store.save_pdf(doc.id, content)

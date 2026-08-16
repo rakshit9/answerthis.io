@@ -49,6 +49,15 @@ decision is explainable. The UI shows the stage log verbatim.
 
 Input: PDF file → Output: ordered, styled text lines.
 
+0. **Readability gate.** A password-protected PDF is rejected outright. So is
+   one with no text layer: the extractor counts the characters it recovered
+   per page and how many pages are image-only, and if the whole document
+   yields under 200 characters it raises `NoTextLayerError` naming the page
+   count and pointing at OCR. Without this a scan parses "successfully" into
+   0 sections and 0 references, which reads like a parser bug rather than an
+   unreadable file. A PDF whose text pages are fine but which has a *few*
+   image-only pages is parsed normally, with those page numbers reported as
+   a warning — degrade, don't refuse.
 1. `page.get_text("dict")` gives blocks → lines → spans with bounding box,
    font name, size, and style flags (bold / italic / **superscript**).
 2. Rotated lines are dropped (the arXiv margin watermark), with a count in
@@ -144,9 +153,15 @@ choice + score are reported:
 
 | Strategy | Signal | Score |
 |---|---|---|
-| `numbered` | entries begin `[12]` / `12.` with near-monotonic numbers | sequence monotonicity + count |
+| `numbered` | entries begin `[12]` / `(12)` / `12.` with near-monotonic numbers (the marker shape is whichever of the three the list actually uses) | sequence monotonicity + count |
 | `hanging_indent` | entry starts at the column's left edge, continuations indented | fraction of entry-final line endings + avg length |
 | `author_start` | line starts like an author list (`Surname, F.` / `F. Surname` / `Surname FM,`) and the previous line looks entry-final | fraction of entries containing a year |
+
+Surname matching here is Unicode-aware (`textutil.UPPER_CLASS`, built once from
+the Latin/Greek/Cyrillic blocks). Python's `[A-Z]` is ASCII-only, so a literal
+one silently fails on `Müller` / `Álvarez` / `Öztürk` — and because
+`author_start` is the fallback the other two strategies lean on, that failure
+collapses an entire reference list into one unsegmented block.
 
 If nothing scores ≥ 0.35 the list is kept as one block and **reported as a
 segmentation failure** — never silently dropped. Hyphen-split words across
@@ -200,9 +215,17 @@ parsed reference entries:
   with ≥ 3 distinct linked numbers *and* no bracket style — this is the
   footnote-marker guard;
 - author–year — parenthetical `(Kingma & Ba, 2015; Smith 2020a)` split on
-  `;`, and narrative `Vaswani et al. (2017)` — linked by first-author family
-  (exact, then fuzzy ≥ 88) + year, with `2020a/b` disambiguation by
-  reference order.
+  `;`, bracketed `[Smith et al. 2020]` (ACM and much of the humanities; a
+  bracket group containing no letter is left to the numeric family), and
+  narrative `Vaswani et al. (2017)` — linked by first-author family (exact,
+  then fuzzy ≥ 88) + year, with `2020a/b` disambiguation by reference order.
+  A group links all-or-nothing: one unlinkable part leaves the whole marker
+  verbatim rather than silently dropping half of it;
+- parenthesised numeric `(1)`, `(1, 3)` (PNAS, ACS, AMA) → via labels, behind
+  the same kind of guard as superscripts: ≥ 3 linked markers *and* no bracket
+  style present, because `(3)` is also how a paper references equation 3. When
+  the guard rejects them the count is reported as a note, and the markers are
+  left as plain text instead of being reported as failed citations.
 
 The dominant family becomes the detected style (with a confidence = its share
 of linked markers, shown in the UI); the tokenize pass then replaces each

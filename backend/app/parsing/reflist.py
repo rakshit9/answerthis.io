@@ -24,14 +24,22 @@ import re
 from dataclasses import dataclass, field
 
 from .pdf_extract import Line
+from .textutil import NAME_WORD, UPPER_CLASS
 
 _NUM_BRACKET_RE = re.compile(r"^\s*\[(\d{1,3})\]\s*(.*)$")
 _NUM_DOT_RE = re.compile(r"^\s*(\d{1,3})\.\s+(.*)$")
+# "(1)" / "1)" entry markers — PNAS, some ACS/AMA journals
+_NUM_PAREN_RE = re.compile(r"^\s*\(?(\d{1,3})\)\s*(.*)$")
+# NB: the uppercase classes are Unicode-aware (see textutil.UPPER_CLASS). With a
+# literal [A-Z] here, a reference list whose entries start "Müller, H." or
+# "Álvarez, J." matches nothing, scores 0, and the whole list collapses into a
+# single unsegmented block.
+_U = UPPER_CLASS
 _AUTHOR_START_RE = re.compile(
-    r"^(?:[A-Z][\w'’\-]+,\s*(?:[A-Z]\.[\s\-]*)+"      # Surname, F. M.
-    r"|(?:[A-Z]\.[\s\-]*)+[A-Z][\w'’\-]+"             # F. M. Surname
-    r"|[A-Z][\w'’\-]+\s+[A-Z]{1,3}\b[,.]"             # Surname FM,  (Vancouver)
-    r"|[A-Z][\w'’\-]+,?\s+[A-Z][\w'’\-]+.*?\b(?:and|&)\b"  # Given Surname ... and
+    r"^(?:" + NAME_WORD + r",\s*(?:" + _U + r"\.[\s\-]*)+"    # Surname, F. M.
+    r"|(?:" + _U + r"\.[\s\-]*)+" + NAME_WORD +               # F. M. Surname
+    r"|" + NAME_WORD + r"\s+" + _U + r"{1,3}\b[,.]"           # Surname FM, (Vancouver)
+    r"|" + NAME_WORD + r",?\s+" + NAME_WORD + r".*?\b(?:and|&)\b"  # Given Surname … and
     r")")
 _ENTRY_FINAL_RE = re.compile(
     r"(?:\.\s*$|\d{4}[a-z]?\.?\s*$|\d+[–\-]\d+\.?\s*$|\)\s*\.?\s*$|[A-Za-z]{2,}\.\s*$)")
@@ -91,9 +99,13 @@ def _try_numbered(lines: list[Line]) -> SegmentationResult:
     groups: list[list[Line]] = []
     labels: list[int] = []
     current: list[Line] = []
-    bracket_hits = sum(1 for l in lines if _NUM_BRACKET_RE.match(l.text))
-    use_bracket = bracket_hits >= 2
-    rx = _NUM_BRACKET_RE if use_bracket else _NUM_DOT_RE
+    # pick the marker shape this list actually uses: "[12]", "(12)"/"12)", "12."
+    by_shape = [(_NUM_BRACKET_RE, sum(1 for l in lines if _NUM_BRACKET_RE.match(l.text))),
+                (_NUM_PAREN_RE, sum(1 for l in lines if _NUM_PAREN_RE.match(l.text))),
+                (_NUM_DOT_RE, sum(1 for l in lines if _NUM_DOT_RE.match(l.text)))]
+    rx, best_hits = max(by_shape, key=lambda p: p[1])
+    if best_hits < 2:
+        rx = _NUM_DOT_RE
     for ln in lines:
         m = rx.match(ln.text)
         expected = labels[-1] + 1 if labels else 1
@@ -117,9 +129,9 @@ def _try_numbered(lines: list[Line]) -> SegmentationResult:
     entries = []
     for lab, grp in zip(labels, groups):
         raw, ital = _join_entry_lines(grp)
-        raw = re.sub(rx, r"\2" if use_bracket else r"\2", raw, count=1)
-        # remove the leading marker from the text
-        m2 = (_NUM_BRACKET_RE if use_bracket else _NUM_DOT_RE).match(grp[0].text)
+        # strip the leading marker: rebuild from the first line's post-marker
+        # remainder plus the continuation lines
+        m2 = rx.match(grp[0].text)
         if m2:
             raw_first = m2.group(2)
             rest_raw, _ = _join_entry_lines(grp[1:])
